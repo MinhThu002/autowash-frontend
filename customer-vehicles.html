@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xe của tôi - AutoWash Pro</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/dashboard.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+</head>
+<body data-page="customer-vehicles">
+<div class="app-layout">
+  <div class="sidebar-overlay"></div>
+  <aside class="sidebar"><div class="sidebar-header"><a href="index.html" class="sidebar-logo">🚿 Auto<span>Wash</span> Pro</a><div class="sidebar-role">Khách hàng</div></div><nav class="sidebar-nav"><ul><li><a href="customer-dashboard.html" class=""><span class="nav-icon">📊</span>Dashboard</a></li><li><a href="customer-vehicles.html" class="active"><span class="nav-icon">🚗</span>Xe của tôi</a></li><li><a href="booking.html" class=""><span class="nav-icon">📅</span>Đặt lịch</a></li><li><a href="booking-history.html" class=""><span class="nav-icon">📋</span>Lịch sử</a></li><li><a href="loyalty.html" class=""><span class="nav-icon">⭐</span>Loyalty</a></li><li><a href="promotions.html" class=""><span class="nav-icon">🎁</span>Khuyến mãi</a></li></ul></nav><div class="sidebar-footer"><a href="#" onclick="logout();return false">🚪 Đăng xuất</a></div></aside>
+  <main class="main-content">
+    <header class="navbar">
+      <div class="navbar-left">
+        <button type="button" class="sidebar-toggle" aria-label="Menu">☰</button>
+        <div class="navbar-title"><h2>Xe của tôi</h2></div>
+      </div>
+      <div class="navbar-right">
+        <div class="navbar-user">
+          <div class="user-avatar">NA</div>
+          <div class="user-info"><div class="user-name">User</div><div class="user-tier">Member</div></div>
+        </div>
+      </div>
+    </header>
+    <div class="page-content">
+<div class="page-header"><h2>Quản lý xe</h2><button class="btn btn-primary" onclick="openAddVehicle()">+ Thêm xe</button></div>
+<div class="card"><div id="vehiclesList"></div></div>
+<div class="modal-overlay" id="vehicleModal">
+  <div class="modal">
+    <div class="modal-header"><h3 id="vehicleModalTitle">Thêm xe mới</h3><button class="modal-close" data-modal-close="vehicleModal">&times;</button></div>
+    <form id="vehicleForm">
+      <div class="modal-body">
+        <input type="hidden" id="vehicleId">
+        <div class="form-group"><label>Biển số</label><input type="text" id="vehiclePlate" required></div>
+        <div class="form-group"><label>Loại xe</label><select id="vehicleType"><option value="Car">Ô tô</option><option value="Motorbike">Xe máy</option></select></div>
+        <div class="form-group"><label>Hãng xe</label><input type="text" id="vehicleBrand" required></div>
+        <div class="form-group"><label>Màu sắc</label><input type="text" id="vehicleColor"></div>
+        <div class="form-group"><label>Ghi chú</label><textarea id="vehicleNotes"></textarea></div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-modal-close="vehicleModal">Hủy</button><button type="submit" class="btn btn-primary">Lưu</button></div>
+    </form>
+  </div>
+</div>
+</div>
+  </main>
+</div>
+  <script src="assets/js/mock-data.js"></script>
+  <script src="assets/js/main.js"></script>
+  <script src="assets/js/modal.js"></script>
+  <script src="assets/js/dashboard.js"></script>
+</body>
+</html>

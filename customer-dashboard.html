@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - AutoWash Pro</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/dashboard.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+</head>
+<body data-page="customer-dashboard">
+<div class="app-layout">
+  <div class="sidebar-overlay"></div>
+  <aside class="sidebar"><div class="sidebar-header"><a href="index.html" class="sidebar-logo">🚿 Auto<span>Wash</span> Pro</a><div class="sidebar-role">Khách hàng</div></div><nav class="sidebar-nav"><ul><li><a href="customer-dashboard.html" class="active"><span class="nav-icon">📊</span>Dashboard</a></li><li><a href="customer-vehicles.html" class=""><span class="nav-icon">🚗</span>Xe của tôi</a></li><li><a href="booking.html" class=""><span class="nav-icon">📅</span>Đặt lịch</a></li><li><a href="booking-history.html" class=""><span class="nav-icon">📋</span>Lịch sử</a></li><li><a href="loyalty.html" class=""><span class="nav-icon">⭐</span>Loyalty</a></li><li><a href="promotions.html" class=""><span class="nav-icon">🎁</span>Khuyến mãi</a></li></ul></nav><div class="sidebar-footer"><a href="#" onclick="logout();return false">🚪 Đăng xuất</a></div></aside>
+  <main class="main-content">
+    <header class="navbar">
+      <div class="navbar-left">
+        <button type="button" class="sidebar-toggle" aria-label="Menu">☰</button>
+        <div class="navbar-title"><h2>Dashboard</h2></div>
+      </div>
+      <div class="navbar-right">
+        <div class="navbar-user">
+          <div class="user-avatar">NA</div>
+          <div class="user-info"><div class="user-name">User</div><div class="user-tier">Member</div></div>
+        </div>
+      </div>
+    </header>
+    <div class="page-content">
+<div class="welcome-banner">
+  <div><h2>Xin chào, <span id="welcomeName">Khách hàng</span>! 👋</h2><p>Chào mừng trở lại AutoWash Pro</p></div>
+  <div class="tier-highlight"><div class="tier-label">Hạng hiện tại</div><div class="tier-value" id="currentTier">Gold</div></div>
+</div>
+<div class="stats-grid">
+  <div class="stat-card"><div class="stat-icon cyan">⭐</div><div class="stat-label">Điểm tích lũy</div><div class="stat-value" id="pointsBalance">0</div></div>
+  <div class="stat-card"><div class="stat-icon blue">🔄</div><div class="stat-label">Tổng lượt rửa</div><div class="stat-value" id="totalVisits">0</div></div>
+  <div class="stat-card"><div class="stat-icon green">💰</div><div class="stat-label">Tổng chi tiêu</div><div class="stat-value" id="totalSpending">0</div></div>
+</div>
+<div class="card tier-progress-card" style="margin-bottom:1.5rem">
+  <h4>Tiến độ lên hạng <span id="nextTierName">Platinum</span></h4>
+  <div class="tier-progress-info"><span id="tierProgressText">0%</span></div>
+  <div class="progress-bar"><div class="progress-bar-fill" id="tierProgressFill" style="width:0%"></div></div>
+</div>
+<div class="dashboard-grid">
+  <div class="card"><div class="card-header"><h3>Lịch hẹn sắp tới</h3><a href="booking.html" class="btn btn-sm btn-primary">Đặt lịch</a></div><div id="upcomingBooking"></div></div>
+  <div class="card"><div class="card-header"><h3>Khuyến mãi gợi ý</h3></div><div id="recommendedPromos" style="display:flex;flex-direction:column;gap:0.75rem"></div></div>
+</div>
+<div class="card"><div class="card-header"><h3>Lịch sử rửa gần đây</h3><a href="booking-history.html">Xem tất cả</a></div><div id="recentHistory"></div></div>
+</div>
+  </main>
+</div>
+  <script src="assets/js/mock-data.js"></script>
+  <script src="assets/js/main.js"></script>
+  <script src="assets/js/modal.js"></script>
+  <script src="assets/js/dashboard.js"></script>
+</body>
+</html>

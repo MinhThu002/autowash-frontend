@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics - AutoWash Pro</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/dashboard.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+</head>
+<body data-page="admin-analytics">
+<div class="app-layout">
+  <div class="sidebar-overlay"></div>
+  <aside class="sidebar"><div class="sidebar-header"><a href="index.html" class="sidebar-logo">🚿 Auto<span>Wash</span> Pro</a><div class="sidebar-role">Quản trị</div></div><nav class="sidebar-nav"><ul><li><a href="admin-dashboard.html" class=""><span class="nav-icon">📊</span>Dashboard</a></li><li><a href="admin-customers.html" class=""><span class="nav-icon">👥</span>Khách hàng</a></li><li><a href="admin-bookings.html" class=""><span class="nav-icon">📅</span>Bookings</a></li><li><a href="admin-services.html" class=""><span class="nav-icon">🔧</span>Dịch vụ</a></li><li><a href="admin-loyalty-tiers.html" class=""><span class="nav-icon">🏆</span>Hạng TV</a></li><li><a href="admin-promotions.html" class=""><span class="nav-icon">🎁</span>Khuyến mãi</a></li><li><a href="admin-analytics.html" class="active"><span class="nav-icon">📈</span>Analytics</a></li></ul></nav><div class="sidebar-footer"><a href="#" onclick="logout();return false">🚪 Đăng xuất</a></div></aside>
+  <main class="main-content">
+    <header class="navbar">
+      <div class="navbar-left">
+        <button type="button" class="sidebar-toggle" aria-label="Menu">☰</button>
+        <div class="navbar-title"><h2>Analytics</h2></div>
+      </div>
+      <div class="navbar-right">
+        <div class="navbar-user">
+          <div class="user-avatar">NA</div>
+          <div class="user-info"><div class="user-name">User</div><div class="user-tier">Member</div></div>
+        </div>
+      </div>
+    </header>
+    <div class="page-content">
+<div class="analytics-grid">
+  <div class="card analytics-card"><h3>Doanh thu</h3><div id="analyticsRevenue"></div></div>
+  <div class="card analytics-card"><h3>Xu hướng booking</h3><div id="analyticsBookings"></div></div>
+  <div class="card analytics-card"><h3>Phân bổ hạng</h3><div id="analyticsTierChart"></div></div>
+  <div class="card"><h3>Tỷ lệ dùng thưởng</h3><div class="progress-bar"><div class="progress-bar-fill" id="rewardUsageFill" style="width:34%"></div></div><p id="rewardUsageRate" class="text-center" style="margin-top:0.5rem">34%</p></div>
+</div>
+<div class="dashboard-grid-equal" style="margin-top:1.25rem">
+  <div class="card"><h3>Top KH trung thành</h3><ul class="top-list" id="topCustomers"></ul></div>
+  <div class="card"><h3>Dịch vụ phổ biến</h3><ul class="top-list" id="topServices"></ul></div>
+</div>
+</div>
+  </main>
+</div>
+  <script src="assets/js/mock-data.js"></script>
+  <script src="assets/js/main.js"></script>
+  <script src="assets/js/modal.js"></script>
+  <script src="assets/js/dashboard.js"></script>
+</body>
+</html>

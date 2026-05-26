@@ -1,0 +1,128 @@
+/* AutoWash Pro - Responsive */
+@media (max-width: 1024px) {
+  .dashboard-grid { grid-template-columns: 1fr; }
+  .dashboard-grid-equal { grid-template-columns: 1fr; }
+  .booking-form-layout { grid-template-columns: 1fr; }
+  .loyalty-hero { grid-template-columns: 1fr; }
+  .analytics-grid { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .main-content {
+    margin-left: 0;
+  }
+
+  .sidebar-toggle {
+    display: block;
+  }
+
+  .navbar-user .user-info {
+    display: none;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .grid-2, .grid-3, .grid-4 {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--white);
+    flex-direction: column;
+    padding: 1rem;
+    gap: 0;
+    border-bottom: 1px solid var(--gray-100);
+    box-shadow: var(--shadow);
+  }
+
+  .landing-menu.open { display: flex; }
+
+  .landing-menu li { width: 100%; }
+  .landing-menu a { display: block; padding: 0.75rem 0; }
+
+  .menu-toggle-landing { display: block; }
+
+  .landing-actions {
+    flex-direction: column;
+    width: 100%;
+    padding: 0 1rem 1rem;
+  }
+
+  .landing-nav { flex-wrap: wrap; position: relative; }
+
+  .hero { padding: 6rem 1rem 3rem; }
+
+  .section { padding: 2.5rem 1rem; }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .welcome-banner {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .schedule-timeline .schedule-item {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-bar input,
+  .filter-bar select {
+    width: 100%;
+  }
+
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.5rem; }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-card {
+    padding: 1.5rem;
+  }
+
+  .card { padding: 1rem; }
+
+  .page-content { padding: 1rem; }
+
+  .table th,
+  .table td {
+    padding: 0.625rem 0.5rem;
+    font-size: 0.8125rem;
+  }
+
+  .hero-buttons {
+    flex-direction: column;
+  }
+
+  .hero-buttons .btn {
+    width: 100%;
+  }
+}

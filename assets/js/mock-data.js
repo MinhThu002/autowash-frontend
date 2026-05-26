@@ -10,11 +10,11 @@ const MOCK_DATA = {
   ],
 
   customers: [
-    { id: 'cust-001', name: 'Nguyễn Văn An', phone: '0901234567', email: 'an.nguyen@email.com', tier: 'gold', points: 2450, totalVisits: 18, totalSpending: 3200000, status: 'active' },
-    { id: 'cust-002', name: 'Trần Thị Bình', phone: '0912345678', email: 'binh.tran@email.com', tier: 'silver', points: 890, totalVisits: 7, totalSpending: 980000, status: 'active' },
-    { id: 'cust-003', name: 'Lê Minh Cường', phone: '0923456789', email: 'cuong.le@email.com', tier: 'platinum', points: 5200, totalVisits: 42, totalSpending: 8500000, status: 'active' },
-    { id: 'cust-004', name: 'Phạm Thu Dung', phone: '0934567890', email: 'dung.pham@email.com', tier: 'member', points: 120, totalVisits: 2, totalSpending: 350000, status: 'active' },
-    { id: 'cust-005', name: 'Hoàng Văn Em', phone: '0945678901', email: 'em.hoang@email.com', tier: 'gold', points: 1800, totalVisits: 14, totalSpending: 2100000, status: 'inactive' }
+    { id: 'cust-001', name: 'Minh Thư 1', phone: '0901234567', email: 'an.nguyen@email.com', tier: 'gold', points: 2450, totalVisits: 18, totalSpending: 3200000, status: 'active' },
+    { id: 'cust-002', name: 'Minh Thư 2', phone: '0912345678', email: 'binh.tran@email.com', tier: 'silver', points: 890, totalVisits: 7, totalSpending: 980000, status: 'active' },
+    { id: 'cust-003', name: 'Minh Thư 3', phone: '0923456789', email: 'cuong.le@email.com', tier: 'platinum', points: 5200, totalVisits: 42, totalSpending: 8500000, status: 'active' },
+    { id: 'cust-004', name: 'Minh Thư 4', phone: '0934567890', email: 'dung.pham@email.com', tier: 'member', points: 120, totalVisits: 2, totalSpending: 350000, status: 'active' },
+    { id: 'cust-005', name: 'Minh Thư 5', phone: '0945678901', email: 'em.hoang@email.com', tier: 'gold', points: 1800, totalVisits: 14, totalSpending: 2100000, status: 'inactive' }
   ],
 
   vehicles: [
@@ -34,12 +34,12 @@ const MOCK_DATA = {
   ],
 
   bookings: [
-    { id: 'BK-2026-001', customerId: 'cust-001', customerName: 'Nguyễn Văn An', vehicleId: 'veh-001', vehiclePlate: '51A-12345', serviceId: 'svc-004', serviceName: 'Rửa tiêu chuẩn', date: '2026-05-22', time: '09:00', status: 'confirmed', totalPrice: 162000, pointsEarned: 180, promotionId: null },
-    { id: 'BK-2026-002', customerId: 'cust-001', customerName: 'Nguyễn Văn An', vehicleId: 'veh-002', vehiclePlate: '59-H1 6789', serviceId: 'svc-002', serviceName: 'Rửa tiêu chuẩn', date: '2026-05-15', time: '14:30', status: 'completed', totalPrice: 72000, pointsEarned: 96 },
-    { id: 'BK-2026-003', customerId: 'cust-002', customerName: 'Trần Thị Bình', vehicleId: 'veh-003', vehiclePlate: '30F-98765', serviceId: 'svc-003', serviceName: 'Rửa nhanh', date: '2026-05-20', time: '10:00', status: 'pending', totalPrice: 114000, pointsEarned: 0 },
-    { id: 'BK-2026-004', customerId: 'cust-003', customerName: 'Lê Minh Cường', vehicleId: 'veh-001', vehiclePlate: '51A-99999', serviceId: 'svc-005', serviceName: 'Rửa cao cấp', date: '2026-05-19', time: '08:00', status: 'in_progress', totalPrice: 297500, pointsEarned: 0 },
-    { id: 'BK-2026-005', customerId: 'cust-001', customerName: 'Nguyễn Văn An', vehicleId: 'veh-001', vehiclePlate: '51A-12345', serviceId: 'svc-003', serviceName: 'Rửa nhanh', date: '2026-05-10', time: '11:00', status: 'completed', totalPrice: 108000, pointsEarned: 120 },
-    { id: 'BK-2026-006', customerId: 'cust-004', customerName: 'Phạm Thu Dung', vehicleId: 'veh-003', vehiclePlate: '30F-11111', serviceId: 'svc-004', serviceName: 'Rửa tiêu chuẩn', date: '2026-05-18', time: '15:00', status: 'cancelled', totalPrice: 180000, pointsEarned: 0 }
+    { id: 'BK-2026-001', customerId: 'cust-001', customerName: 'Minh Thư 1', vehicleId: 'veh-001', vehiclePlate: '51A-12345', serviceId: 'svc-004', serviceName: 'Rửa tiêu chuẩn', date: '2026-05-22', time: '09:00', status: 'confirmed', totalPrice: 162000, pointsEarned: 180, promotionId: null },
+    { id: 'BK-2026-002', customerId: 'cust-001', customerName: 'Minh Thư 1', vehicleId: 'veh-002', vehiclePlate: '59-H1 6789', serviceId: 'svc-002', serviceName: 'Rửa tiêu chuẩn', date: '2026-05-15', time: '14:30', status: 'completed', totalPrice: 72000, pointsEarned: 96 },
+    { id: 'BK-2026-003', customerId: 'cust-002', customerName: 'Minh Thư 2', vehicleId: 'veh-003', vehiclePlate: '30F-98765', serviceId: 'svc-003', serviceName: 'Rửa nhanh', date: '2026-05-20', time: '10:00', status: 'pending', totalPrice: 114000, pointsEarned: 0 },
+    { id: 'BK-2026-004', customerId: 'cust-003', customerName: 'Minh Thư 3', vehicleId: 'veh-001', vehiclePlate: '51A-99999', serviceId: 'svc-005', serviceName: 'Rửa cao cấp', date: '2026-05-19', time: '08:00', status: 'in_progress', totalPrice: 297500, pointsEarned: 0 },
+    { id: 'BK-2026-005', customerId: 'cust-001', customerName: 'Minh Thư 1', vehicleId: 'veh-001', vehiclePlate: '51A-12345', serviceId: 'svc-003', serviceName: 'Rửa nhanh', date: '2026-05-10', time: '11:00', status: 'completed', totalPrice: 108000, pointsEarned: 120 },
+    { id: 'BK-2026-006', customerId: 'cust-004', customerName: 'Minh Thư 4', vehicleId: 'veh-003', vehiclePlate: '30F-11111', serviceId: 'svc-004', serviceName: 'Rửa tiêu chuẩn', date: '2026-05-18', time: '15:00', status: 'cancelled', totalPrice: 180000, pointsEarned: 0 }
   ],
 
   promotions: [
@@ -78,9 +78,9 @@ const MOCK_DATA = {
     bookingTrend: [45, 52, 48, 61, 55, 67, 72, 68, 75, 80, 78, 85],
     rewardUsageRate: 34,
     topLoyalCustomers: [
-      { name: 'Lê Minh Cường', visits: 42, spending: 8500000 },
-      { name: 'Nguyễn Văn An', visits: 18, spending: 3200000 },
-      { name: 'Hoàng Văn Em', visits: 14, spending: 2100000 }
+      { name: 'Minh Thư 3', visits: 42, spending: 8500000 },
+      { name: 'Minh Thư 1', visits: 18, spending: 3200000 },
+      { name: 'Minh Thư 5', visits: 14, spending: 2100000 }
     ],
     topServices: [
       { name: 'Rửa tiêu chuẩn (Car)', count: 412 },
@@ -91,11 +91,11 @@ const MOCK_DATA = {
   },
 
   staffSchedule: [
-    { id: 'ss-001', time: '08:00', customerId: 'cust-003', customerName: 'Lê Minh Cường', vehicle: 'Mercedes C200', licensePlate: '51A-99999', service: 'Rửa cao cấp', status: 'in_progress' },
-    { id: 'ss-002', time: '09:00', customerId: 'cust-001', customerName: 'Nguyễn Văn An', vehicle: 'Toyota Camry', licensePlate: '51A-12345', service: 'Rửa tiêu chuẩn', status: 'confirmed' },
-    { id: 'ss-003', time: '10:00', customerId: 'cust-002', customerName: 'Trần Thị Bình', vehicle: 'Hyundai Tucson', licensePlate: '30F-98765', service: 'Rửa nhanh', status: 'confirmed' },
-    { id: 'ss-004', time: '11:00', customerId: 'cust-004', customerName: 'Phạm Thu Dung', vehicle: 'Mazda 3', licensePlate: '30F-11111', service: 'Rửa tiêu chuẩn', status: 'pending' },
-    { id: 'ss-005', time: '14:00', customerId: 'cust-001', customerName: 'Nguyễn Văn An', vehicle: 'Honda Vision', licensePlate: '59-H1 6789', service: 'Rửa tiêu chuẩn', status: 'pending' }
+    { id: 'ss-001', time: '08:00', customerId: 'cust-003', customerName: 'Minh Thư 3', vehicle: 'Mercedes C200', licensePlate: '51A-99999', service: 'Rửa cao cấp', status: 'in_progress' },
+    { id: 'ss-002', time: '09:00', customerId: 'cust-001', customerName: 'Minh Thư 1', vehicle: 'Toyota Camry', licensePlate: '51A-12345', service: 'Rửa tiêu chuẩn', status: 'confirmed' },
+    { id: 'ss-003', time: '10:00', customerId: 'cust-002', customerName: 'Minh Thư 2', vehicle: 'Hyundai Tucson', licensePlate: '30F-98765', service: 'Rửa nhanh', status: 'confirmed' },
+    { id: 'ss-004', time: '11:00', customerId: 'cust-004', customerName: 'Minh Thư 4', vehicle: 'Mazda 3', licensePlate: '30F-11111', service: 'Rửa tiêu chuẩn', status: 'pending' },
+    { id: 'ss-005', time: '14:00', customerId: 'cust-001', customerName: 'Minh Thư 1', vehicle: 'Honda Vision', licensePlate: '59-H1 6789', service: 'Rửa tiêu chuẩn', status: 'pending' }
   ]
 };
 

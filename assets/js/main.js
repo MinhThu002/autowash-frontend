@@ -59,7 +59,7 @@ function initAuthForms() {
   document.getElementById('registerForm')?.addEventListener('submit', handleRegister);
 }
 
-function handleLogin(e) {
+async function handleLogin(e) {
   e.preventDefault();
   const email = document.getElementById('loginEmail')?.value.trim();
   const password = document.getElementById('loginPassword')?.value;
@@ -70,13 +70,30 @@ function handleLogin(e) {
     return;
   }
 
-  const role = detectLoginRole(email);
-  const user = {
+  let role = detectLoginRole(email);
+  let user = {
     email,
     role,
     customerId: role === 'customer' ? 'cust-001' : null,
     name: role === 'admin' ? 'Admin' : role === 'staff' ? 'Nhân viên' : 'Nguyễn Văn An'
   };
+
+  if (window.AutoWashAPI) {
+    try {
+      const auth = await window.AutoWashAPI.auth.login(email, password);
+      role = auth.roleName === 'MANAGER' ? 'admin' : auth.roleName.toLowerCase();
+      user = {
+        email: auth.loginKey,
+        role,
+        customerId: role === 'customer' ? `cust-${String(auth.id).padStart(3, '0')}` : null,
+        name: auth.fullName,
+        backendAuth: auth
+      };
+    } catch (error) {
+      showFormError(e.target, error.message || 'Đăng nhập thất bại.');
+      return;
+    }
+  }
 
   localStorage.setItem('autowash_user', JSON.stringify(user));
   if (remember) localStorage.setItem('autowash_remember', 'true');
@@ -96,7 +113,7 @@ function detectLoginRole(email) {
   return 'customer';
 }
 
-function handleRegister(e) {
+async function handleRegister(e) {
   e.preventDefault();
   const name = document.getElementById('regName')?.value.trim();
   const phone = document.getElementById('regPhone')?.value.trim();
@@ -115,6 +132,20 @@ function handleRegister(e) {
   if (password !== confirm) {
     alert('Mật khẩu xác nhận không khớp.');
     return;
+  }
+
+  if (window.AutoWashAPI) {
+    try {
+      await window.AutoWashAPI.auth.register({
+        fullName: name,
+        phoneNumber: phone,
+        email,
+        password
+      });
+    } catch (error) {
+      alert(error.message || 'Đăng ký thất bại.');
+      return;
+    }
   }
 
   localStorage.setItem('autowash_user', JSON.stringify({

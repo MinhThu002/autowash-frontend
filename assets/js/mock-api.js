@@ -6,12 +6,44 @@
   const DELAY_MS = 180;
   const originalFetch = window.fetch ? window.fetch.bind(window) : null;
 
+  function getConfig() {
+    return window.AutoWashConfig || { baseUrl: 'http://localhost:8080', useMock: false };
+  }
+
+  function getAuthToken() {
+    return localStorage.getItem('autowash_token');
+  }
+
+  async function realFetch(path, options = {}) {
+    const config = getConfig();
+    const base = String(config.baseUrl || 'http://localhost:8080').replace(/\/$/, '');
+    const url = path.startsWith('http') ? path : `${base}${path.startsWith('/') ? path : `/${path}`}`;
+
+    const headers = new Headers(options.headers || {});
+    if (!headers.has('Content-Type') && options.body != null && typeof options.body !== 'string' && !(options.body instanceof FormData)) {
+      headers.set('Content-Type', 'application/json');
+    }
+
+    const token = getAuthToken();
+    if (token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    let body = options.body;
+    if (body != null && typeof body === 'object' && !(body instanceof FormData) && !(body instanceof Blob)) {
+      body = JSON.stringify(body);
+    }
+
+    return (originalFetch || fetch)(url, { ...options, headers, body });
+  }
+
   const endpointDocs = {
     auth: [
       'POST /api/auth/register',
       'POST /api/auth/login',
       'POST /api/auth/forgot-password',
-      'POST /api/auth/reset-password'
+      'POST /api/auth/reset-password',
+      'POST /api/auth/google'
     ],
     customers: ['GET /api/customers/profile?customerId=1'],
     vehicles: [
@@ -225,9 +257,9 @@
 
   function toAuthRole(email) {
     const loginKey = String(email || '').toLowerCase();
-    if (loginKey.includes('admin') || loginKey.includes('manager')) return 'MANAGER';
-    if (loginKey.includes('staff')) return 'STAFF';
-    return 'CUSTOMER';
+    if (loginKey.includes('admin') || loginKey.includes('manager') || loginKey === 'admin') return 'ROLE_MANAGER';
+    if (loginKey.includes('staff') || loginKey.startsWith('staff')) return 'ROLE_STAFF';
+    return 'ROLE_CUSTOMER';
   }
 
   function handleAuth(method, parts, body) {
@@ -239,19 +271,12 @@
       const customers = load('customers', MOCK_DATA.customers);
       const customer = customers.find(c => c.email === loginKey || c.phone === loginKey || c.phoneNumber === loginKey) || customers[0];
       const auth = {
-        id: roleName === 'CUSTOMER' ? numId(customer.id) : roleName === 'STAFF' ? 2 : 1,
+        id: roleName === 'ROLE_CUSTOMER' ? numId(customer.id) : roleName === 'ROLE_STAFF' ? 2 : 1,
         loginKey,
-        fullName: roleName === 'CUSTOMER' ? customer.name : roleName === 'STAFF' ? 'Nhân viên AutoWash' : 'Quản lý AutoWash',
-        roleName
+        fullName: roleName === 'ROLE_CUSTOMER' ? customer.name : roleName === 'ROLE_STAFF' ? 'Nhân viên AutoWash' : 'Quản lý AutoWash',
+        roleName,
+        token: 'mock-jwt-token'
       };
-
-      localStorage.setItem('autowash_user', JSON.stringify({
-        email: loginKey,
-        role: roleName === 'MANAGER' ? 'admin' : roleName.toLowerCase(),
-        customerId: roleName === 'CUSTOMER' ? customer.id : null,
-        name: auth.fullName,
-        backendAuth: auth
-      }));
 
       return respond(auth);
     }
@@ -290,6 +315,17 @@
       if (!body.email || !body.otp || !body.newPassword) return fail('Email, OTP and new password are required');
       if (body.otp !== '123456') return fail('Invalid OTP');
       return respond('Password reset successfully');
+    }
+
+    if (method === 'POST' && parts[1] === 'google') {
+      if (!body.token) return fail('Google ID Token cannot be blank', 401);
+      return respond({
+        id: 1,
+        loginKey: 'google.user@gmail.com',
+        fullName: 'Google User',
+        roleName: 'ROLE_CUSTOMER',
+        token: 'mock-google-jwt-token'
+      });
     }
 
     return null;
@@ -543,6 +579,19 @@
   }
 
   async function request(path, options = {}) {
+    const config = getConfig();
+
+    if (!config.useMock) {
+      const response = await realFetch(path, {
+        method: options.method || 'GET',
+        body: options.body
+      });
+      const contentType = response.headers.get('Content-Type') || '';
+      const payload = contentType.includes('application/json') ? await response.json() : await response.text();
+      if (!response.ok) throw new Error(typeof payload === 'string' ? payload : JSON.stringify(payload));
+      return payload;
+    }
+
     const response = await mockFetch(path, {
       method: options.method || 'GET',
       body: options.body ? JSON.stringify(options.body) : undefined
@@ -556,11 +605,13 @@
   window.AutoWashAPI = {
     endpoints: endpointDocs,
     request,
+    getToken: getAuthToken,
     auth: {
       login: (loginKey, password) => request('/api/auth/login', { method: 'POST', body: { loginKey, password } }),
       register: (payload) => request('/api/auth/register', { method: 'POST', body: payload }),
       forgotPassword: (email) => request('/api/auth/forgot-password', { method: 'POST', body: { email } }),
-      resetPassword: (payload) => request('/api/auth/reset-password', { method: 'POST', body: payload })
+      resetPassword: (payload) => request('/api/auth/reset-password', { method: 'POST', body: payload }),
+      loginWithGoogle: (token) => request('/api/auth/google', { method: 'POST', body: { token } })
     },
     customers: {
       profile: (customerId) => request(`/api/customers/profile?customerId=${customerId}`)
@@ -605,7 +656,18 @@
     window.fetch = (input, init) => {
       const rawUrl = typeof input === 'string' ? input : input.url;
       const url = new URL(rawUrl, window.location.origin);
-      return url.pathname.startsWith(API_PREFIX) ? mockFetch(input, init) : originalFetch(input, init);
+      if (!url.pathname.startsWith(API_PREFIX)) return originalFetch(input, init);
+
+      if (!getConfig().useMock) {
+        const path = `${url.pathname}${url.search}`;
+        return realFetch(path, {
+          method: init?.method || 'GET',
+          body: init?.body,
+          headers: init?.headers
+        });
+      }
+
+      return mockFetch(input, init);
     };
   }
 })();

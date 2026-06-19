@@ -13,22 +13,26 @@
     <p class="auth-subtitle">Đăng nhập vào tài khoản</p>
     <form id="loginForm">
       <div class="form-group">
-        <label for="loginEmail">Email / Số điện thoại</label>
-        <input type="text" id="loginEmail" placeholder="email@example.com" required>
+        <label for="loginEmail">Email / Tên đăng nhập</label>
+        <input type="text" id="loginEmail" placeholder="email@example.com hoặc admin" required>
       </div>
       <div class="form-group">
         <label for="loginPassword">Mật khẩu</label>
         <input type="password" id="loginPassword" required>
       </div>
-      <div class="form-check"> 
+      <div class="form-check">
         <input type="checkbox" id="rememberMe">
         <label for="rememberMe">Ghi nhớ đăng nhập</label>
       </div>
       <button type="submit" class="btn btn-primary btn-block">Đăng nhập</button>
     </form>
-    <p class="auth-links">Chưa có tài khoản? <a href="register.html">Đăng ký</a></p>
-    <p class="form-hint text-center" style="margin-top:1rem">Demo: customer@mail.com | admin@mail.com | staff@mail.com</p>
+    <p class="auth-links">
+      <a href="forgot-password.html">Quên mật khẩu?</a>
+      · Chưa có tài khoản? <a href="register.html">Đăng ký</a>
+    </p>
+    <p class="form-hint text-center" style="margin-top:1rem">Demo BE: admin / 123456789 · staff1 / 123456789</p>
   </div>
+  <script src="assets/js/api-config.js"></script>
   <script src="assets/js/mock-data.js"></script>
   <script src="assets/js/mock-api.js"></script>
   <script src="assets/js/main.js"></script>

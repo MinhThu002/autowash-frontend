@@ -350,6 +350,7 @@ function renderAdminAnalytics() {
 
   document.getElementById('rewardUsageRate').textContent = d.rewardUsageRate + '%';
   document.getElementById('rewardUsageFill').style.width = d.rewardUsageRate + '%';
+  
 
   const topEl = document.getElementById('topCustomers');
   d.topLoyalCustomers.forEach((c, i) => {

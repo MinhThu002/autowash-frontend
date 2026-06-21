@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'admin-customers': renderAdminCustomers,
     'admin-bookings': renderAdminBookings,
     'admin-services': renderAdminServices,
+    'admin-time-slots': renderAdminTimeSlots,
     'admin-loyalty-tiers': renderAdminTiers,
     'admin-promotions': renderAdminPromotions,
     'admin-analytics': renderAdminAnalytics,
@@ -303,17 +304,31 @@ function updateBookingStatus(id, status) {
 }
 
 function renderAdminServices() {
-  const tbody = document.querySelector('#servicesTable tbody');
-  getServices().forEach(s => {
-    tbody.innerHTML += `<tr data-id="${s.id}">
-      <td><strong>${s.name}</strong></td><td>${s.vehicleType}</td><td>${s.duration} phút</td>
-      <td>${formatCurrency(s.price)}</td><td>${s.description}</td>
-      <td>${getStatusBadge(s.active ? 'active' : 'inactive')}</td>
-      <td class="actions">
-        <button class="btn btn-sm btn-secondary" onclick="editService('${s.id}')">Sửa</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteService('${s.id}')">Xóa</button>
-      </td></tr>`;
-  });
+  requireAuth(['admin']);
+  
+  // Initialize wash services module (handles form, modal, etc)
+  if (typeof initWashServices === 'function') {
+    initWashServices();
+  }
+  
+  // Load services from backend
+  if (typeof loadWashServices === 'function') {
+    loadWashServices();
+  }
+}
+
+function renderAdminTimeSlots() {
+  requireAuth(['admin']);
+  
+  // Initialize time slots module (handles form, modal, etc)
+  if (typeof initTimeSlots === 'function') {
+    initTimeSlots();
+  }
+  
+  // Load time slots from backend
+  if (typeof loadTimeSlots === 'function') {
+    loadTimeSlots();
+  }
 }
 
 function renderAdminTiers() {

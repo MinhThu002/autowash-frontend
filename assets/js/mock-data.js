@@ -165,6 +165,40 @@ function getTierBadge(tierId) {
   return `<span class="badge badge-tier ${colors[tierId] || ''}">${tier.name}</span>`;
 }
 
+function normalizeTierKey(tier) {
+  const value = String(tier || '').toLowerCase();
+  if (value.includes('bronze') || value === 'member') return 'member';
+  if (value.includes('silver')) return 'silver';
+  if (value.includes('gold')) return 'gold';
+  if (value.includes('diamond') || value.includes('platinum')) return 'platinum';
+  return value || 'member';
+}
+
+function getTierBadgeFromLoyaltyTier(loyaltyTier) {
+  return getTierBadge(normalizeTierKey(loyaltyTier));
+}
+
+function normalizeCustomer(customer) {
+  return {
+    fullName: customer.fullName || customer.name || '',
+    phoneNumber: customer.phoneNumber || customer.phone || '',
+    email: customer.email || '',
+    loyaltyTier: customer.loyaltyTier || customer.currentTier || customer.tier || 'member',
+    currentPoints: Number(customer.currentPoints ?? customer.pointsBalance ?? customer.points ?? 0),
+    totalVisits: Number(customer.totalVisits ?? 0),
+    totalSpend: Number(customer.totalSpend ?? customer.totalSpending ?? 0)
+  };
+}
+
+async function fetchAdminCustomers() {
+  if (!window.AutoWashAPI) {
+    throw new Error('API chưa sẵn sàng.');
+  }
+
+  const list = await window.AutoWashAPI.customers.getAll();
+  return (Array.isArray(list) ? list : []).map(normalizeCustomer);
+}
+
 function saveToStorage(key, data) {
   localStorage.setItem('autowash_' + key, JSON.stringify(data));
 }

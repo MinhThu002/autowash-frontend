@@ -313,13 +313,43 @@ function renderAdminDashboard() {
 }
 
 function renderAdminCustomers() {
+  if (!requireAuth(['admin'])) return;
+
   const tbody = document.querySelector('#customersTable tbody');
-  MOCK_DATA.customers.forEach(c => {
-    tbody.innerHTML += `<tr data-tier="${c.tier}">
-      <td><strong>${c.name}</strong></td><td>${c.phone}</td><td>${c.email}</td>
-      <td>${getTierBadge(c.tier)}</td><td>${c.points}</td><td>${c.totalVisits}</td>
-      <td>${formatCurrency(c.totalSpending)}</td><td>${getStatusBadge(c.status)}</td></tr>`;
-  });
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="7">Đang tải danh sách khách hàng...</td></tr>';
+
+  fetchAdminCustomers()
+    .then(customers => {
+      if (!customers.length) {
+        tbody.innerHTML = '<tr><td colspan="7">Chưa có khách hàng.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = customers.map(c => {
+        const tierKey = normalizeTierKey(c.loyaltyTier);
+        const searchText = `${c.fullName} ${c.phoneNumber} ${c.email}`.toLowerCase();
+        return `<tr data-tier="${tierKey}" data-search="${searchText}">
+          <td><strong>${c.fullName}</strong></td>
+          <td>${c.phoneNumber}</td>
+          <td>${c.email}</td>
+          <td>${getTierBadgeFromLoyaltyTier(c.loyaltyTier)}</td>
+          <td>${c.currentPoints.toLocaleString('vi-VN')}</td>
+          <td>${c.totalVisits}</td>
+          <td>${formatCurrency(c.totalSpend)}</td>
+        </tr>`;
+      }).join('');
+
+      filterTable('customersTable', {
+        tier: document.getElementById('filterTier')?.value,
+        search: document.getElementById('searchCustomer')?.value
+      });
+    })
+    .catch(error => {
+      tbody.innerHTML = '<tr><td colspan="7">Không tải được danh sách khách hàng.</td></tr>';
+      showToast(error.message || 'Không tải được danh sách khách hàng.');
+    });
 }
 
 function renderAdminBookings() {

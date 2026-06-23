@@ -45,7 +45,10 @@
       'POST /api/auth/reset-password',
       'POST /api/auth/google'
     ],
-    customers: ['GET /api/customers/profile?customerId=1'],
+    customers: [
+      'GET /api/customers',
+      'GET /api/customers/profile?customerId=1'
+    ],
     vehicles: [
       'GET /api/vehicles/customer?customerId=1',
       'POST /api/vehicles',
@@ -182,6 +185,20 @@
       totalVisits: customer.totalVisits || 0,
       totalSpending: customer.totalSpending || 0,
       status: customer.status || 'active'
+    };
+  }
+
+  function toBackendCustomerList(customer) {
+    const tierMap = { member: 'BRONZE', silver: 'SILVER', gold: 'GOLD', platinum: 'DIAMOND' };
+    const tierKey = customer.tier || customer.currentTier || 'member';
+    return {
+      fullName: customer.fullName || customer.name,
+      phoneNumber: customer.phoneNumber || customer.phone,
+      email: customer.email,
+      loyaltyTier: customer.loyaltyTier || tierMap[tierKey] || String(tierKey).toUpperCase(),
+      currentPoints: Number(customer.currentPoints ?? customer.points ?? 0),
+      totalVisits: Number(customer.totalVisits ?? 0),
+      totalSpend: Number(customer.totalSpend ?? customer.totalSpending ?? 0)
     };
   }
 
@@ -346,6 +363,11 @@
   }
 
   function handleCustomers(method, parts, params) {
+    if (method === 'GET' && parts.length === 1) {
+      const customers = load('customers', MOCK_DATA.customers);
+      return respond(customers.map(toBackendCustomerList));
+    }
+
     if (method === 'GET' && parts[1] === 'profile') {
       const customerId = params.get('customerId');
       const customer = load('customers', MOCK_DATA.customers).find(c => numId(c.id) === Number(customerId));
@@ -722,6 +744,7 @@
       loginWithGoogle: (token) => request('/api/auth/google', { method: 'POST', body: { token } })
     },
     customers: {
+      getAll: () => request('/api/customers'),
       profile: (customerId) => request(`/api/customers/profile?customerId=${customerId}`)
     },
     vehicles: {

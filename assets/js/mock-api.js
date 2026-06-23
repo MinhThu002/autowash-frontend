@@ -210,6 +210,42 @@
     };
   }
 
+  /* --- AUTOWASH API INTEGRATION: LOYALTY TIERS MAPPING --- */
+  function toBackendLoyaltyTier(tier) {
+    return {
+      id: tier.id,
+      tierName: tier.name,
+      requiredVisits: tier.requiredVisits,
+      requiredSpending: tier.requiredSpending,
+      pointMultiplier: tier.pointRate,
+      bookingWindowDays: tier.bookingWindow,
+      discountPercent: tier.discountPercent,
+      benefits: Array.isArray(tier.benefits) ? tier.benefits.join(', ') : (tier.benefits || ''),
+      isActive: tier.isActive ?? true
+    };
+  }
+
+  function fromBackendLoyaltyTier(body, existing) {
+    let benefits = [];
+    if (Array.isArray(body.benefits)) {
+      benefits = body.benefits;
+    } else if (typeof body.benefits === 'string') {
+      benefits = body.benefits.split(',').map(b => b.trim()).filter(Boolean);
+    }
+    return {
+      ...(existing || {}),
+      id: existing?.id || String(body.tierName || '').toLowerCase(),
+      name: body.tierName,
+      requiredVisits: Number(body.requiredVisits ?? 0),
+      requiredSpending: Number(body.requiredSpending ?? 0),
+      pointRate: Number(body.pointMultiplier || 1),
+      bookingWindow: Number(body.bookingWindowDays || 7),
+      discountPercent: Number(body.discountPercent ?? 0),
+      benefits: benefits,
+      isActive: body.isActive ?? true
+    };
+  }
+
   function toBackendTimeSlot(slot) {
     return {
       slotId: numId(slot.slotId || slot.id),
@@ -463,6 +499,11 @@
 
   function handlePromotions(method, parts, body) {
     let promotions = load('promotions', MOCK_DATA.promotions);
+
+    if (method === 'GET' && parts[1] === 'active') {
+      return respond(promotions.filter(p => p.status === 'active').map(toBackendPromotion));
+    }
+
     const id = Number(parts[1]);
 
     if (method === 'GET' && parts.length === 1) return respond(promotions.map(toBackendPromotion));
@@ -489,6 +530,44 @@
       promotions = promotions.filter(p => numId(p.id) !== id);
       save('promotions', promotions);
       return respond(`Promotion with ID ${id} has been deleted successfully!`);
+    }
+
+    return null;
+  }
+
+  /* --- AUTOWASH API INTEGRATION: LOYALTY TIERS HANDLER --- */
+  function handleLoyaltyTiers(method, parts, body) {
+    let tiers = load('loyaltyTiers', MOCK_DATA.loyaltyTiers);
+    
+    if (method === 'GET' && parts[1] === 'active') {
+      return respond(tiers.filter(t => t.isActive !== false).map(toBackendLoyaltyTier));
+    }
+    
+    if (method === 'GET' && parts.length === 1) {
+      return respond(tiers.map(toBackendLoyaltyTier));
+    }
+
+    if (method === 'POST') {
+      const tier = fromBackendLoyaltyTier(body);
+      tiers.push(tier);
+      save('loyaltyTiers', tiers);
+      return respond(toBackendLoyaltyTier(tier), 201);
+    }
+
+    const id = parts[1];
+    const index = tiers.findIndex(t => t.id === id);
+    if (index < 0) return fail('Loyalty tier not found');
+
+    if (method === 'PUT') {
+      tiers[index] = fromBackendLoyaltyTier(body, tiers[index]);
+      save('loyaltyTiers', tiers);
+      return respond(toBackendLoyaltyTier(tiers[index]));
+    }
+
+    if (method === 'DELETE') {
+      tiers[index].isActive = false;
+      save('loyaltyTiers', tiers);
+      return respond(`Loyalty tier deactivated successfully with ID: ${id}`);
     }
 
     return null;
@@ -565,6 +644,7 @@
     if (resource === 'admin' && parts[1] === 'wash-services') return handleWashServices(method, parts, body);
     if (resource === 'admin' && parts[1] === 'time-slots') return handleTimeSlots(method, parts, body);
     if (resource === 'promotions') return handlePromotions(method, parts, body);
+    if (resource === 'loyalty-tiers') return handleLoyaltyTiers(method, parts, body);
     if (resource === 'bookings') return handleBookings(method, parts, body);
 
     return handleDemo(method, parts, body) || fail(`Mock API does not support ${method} ${pathname}`, 404);
@@ -639,6 +719,13 @@
       create: (payload) => request('/api/promotions', { method: 'POST', body: payload }),
       update: (id, payload) => request(`/api/promotions/${id}`, { method: 'PUT', body: payload }),
       remove: (id) => request(`/api/promotions/${id}`, { method: 'DELETE' })
+    },
+    loyaltyTiers: {
+      list: () => request('/api/loyalty-tiers'),
+      listActive: () => request('/api/loyalty-tiers/active'),
+      create: (payload) => request('/api/loyalty-tiers', { method: 'POST', body: payload }),
+      update: (id, payload) => request(`/api/loyalty-tiers/${id}`, { method: 'PUT', body: payload }),
+      remove: (id) => request(`/api/loyalty-tiers/${id}`, { method: 'DELETE' })
     },
     bookings: {
       list: () => request('/api/bookings'),

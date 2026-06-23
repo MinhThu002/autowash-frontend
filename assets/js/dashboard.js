@@ -318,11 +318,23 @@ function renderAdminServices() {
 
 function renderAdminTiers() {
   const tbody = document.querySelector('#tiersTable tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
   MOCK_DATA.loyaltyTiers.forEach(t => {
-    tbody.innerHTML += `<tr>
-      <td><strong>${t.name}</strong></td><td>${t.requiredVisits}</td><td>${formatCurrency(t.requiredSpending)}</td>
-      <td>x${t.pointRate}</td><td>${t.bookingWindow} ngày</td><td>${t.discountPercent}%</td>
-      <td>${t.benefits.join(', ')}</td></tr>`;
+    const activeStatus = t.isActive ?? t.active ?? true;
+    tbody.innerHTML += `<tr data-id="${t.id}">
+      <td><strong>${t.name}</strong></td>
+      <td>${t.requiredVisits}</td>
+      <td>${formatCurrency(t.requiredSpending)}</td>
+      <td>x${t.pointRate}</td>
+      <td>${t.bookingWindow} ngày</td>
+      <td>${t.discountPercent}%</td>
+      <td>${Array.isArray(t.benefits) ? t.benefits.join(', ') : (t.benefits || '')}</td>
+      <td>${getStatusBadge(activeStatus ? 'active' : 'inactive')}</td>
+      <td class="actions">
+        <button class="btn btn-sm btn-secondary" onclick="editLoyaltyTier('${t.id}')">Sửa</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteLoyaltyTier('${t.id}')">Xóa</button>
+      </td></tr>`;
   });
 }
 
@@ -334,7 +346,7 @@ function renderAdminPromotions() {
       <td><strong>${p.name}</strong></td><td>${p.description}</td><td>${disc}</td>
       <td>${formatDate(p.startDate)}</td><td>${formatDate(p.endDate)}</td>
       <td>${p.targetTier === 'all' ? 'Tất cả' : getTierById(p.targetTier).name}</td>
-      <td>${p.usedCount}/${p.usageLimit}</td><td>${getStatusBadge(p.status)}</td>
+      <td>${getStatusBadge(p.status)}</td>
       <td class="actions">
         <button class="btn btn-sm btn-secondary" onclick="editPromotion('${p.id}')">Sửa</button>
         <button class="btn btn-sm btn-danger" onclick="deletePromotion('${p.id}')">Xóa</button>
@@ -431,6 +443,7 @@ function initCrudModals(page) {
   document.getElementById('vehicleForm')?.addEventListener('submit', saveVehicle);
   document.getElementById('serviceForm')?.addEventListener('submit', saveService);
   document.getElementById('promotionForm')?.addEventListener('submit', savePromotion);
+  document.getElementById('tierForm')?.addEventListener('submit', saveLoyaltyTier);
 }
 
 function saveService(e) {
@@ -478,11 +491,11 @@ function openAddService() {
   openModal('serviceModal');
 }
 
-function savePromotion(e) {
+/* --- AUTOWASH API INTEGRATION: SAVE PROMOTION --- */
+async function savePromotion(e) {
   e.preventDefault();
   const id = document.getElementById('promoId').value;
   const data = {
-    id: id || 'promo-' + Date.now(),
     name: document.getElementById('promoName').value,
     description: document.getElementById('promoDescription').value,
     discountType: document.getElementById('promoDiscountType').value,
@@ -490,12 +503,63 @@ function savePromotion(e) {
     startDate: document.getElementById('promoStart').value,
     endDate: document.getElementById('promoEnd').value,
     targetTier: document.getElementById('promoTier').value,
-    usageLimit: parseInt(document.getElementById('promoLimit').value),
-    usedCount: 0,
+    usageLimit: 999,
     status: document.getElementById('promoStatus').value
   };
+
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  if (data.startDate < todayStr) {
+    data.startDate = todayStr;
+    const startInput = document.getElementById('promoStart');
+    if (startInput) startInput.value = todayStr;
+  }
+
+  if (data.endDate < data.startDate) {
+    alert('Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu!');
+    return;
+  }
+
+  try {
+    const url = id ? `/api/promotions/${id}` : `/api/promotions`;
+    const method = id ? 'PUT' : 'POST';
+    const backendData = typeof mapFrontendPromoToBackend === 'function' ? mapFrontendPromoToBackend(data) : data;
+    
+    const res = await fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(backendData)
+    });
+    
+    if (!res.ok) {
+      let errorMsg = 'Lỗi lưu thông tin lên database.';
+      try {
+        const errData = await res.json();
+        if (errData.message) errorMsg = errData.message;
+        else if (errData.error) errorMsg = errData.error;
+        if (errData.errors && Array.isArray(errData.errors)) {
+          errorMsg += ': ' + errData.errors.map(e => e.defaultMessage || e.message).join(', ');
+        }
+      } catch (e) {
+        try {
+          const text = await res.text();
+          if (text) errorMsg = text;
+        } catch (any) {}
+      }
+      throw new Error(errorMsg);
+    }
+  } catch (err) {
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      console.warn('Backend API offline, using localStorage fallback', err);
+    } else {
+      alert('Không thể lưu vào database:\n' + err.message);
+      return;
+    }
+  }
+
   let promos = getPromotions();
-  promos = id ? promos.map(p => p.id === id ? { ...p, ...data } : p) : [...promos, data];
+  const savedPromo = { ...data, id: id || 'promo-' + Date.now(), usedCount: 0 };
+  promos = id ? promos.map(p => p.id === id ? { ...p, ...data } : p) : [...promos, savedPromo];
   saveToStorage('promotions', promos);
   closeModal('promotionModal');
   showToast('Lưu khuyến mãi thành công!');
@@ -513,14 +577,37 @@ function editPromotion(id) {
   document.getElementById('promoStart').value = p.startDate;
   document.getElementById('promoEnd').value = p.endDate;
   document.getElementById('promoTier').value = p.targetTier;
-  document.getElementById('promoLimit').value = p.usageLimit;
   document.getElementById('promoStatus').value = p.status;
   openModal('promotionModal');
 }
 
-function deletePromotion(id) {
+/* --- AUTOWASH API INTEGRATION: DELETE PROMOTION --- */
+async function deletePromotion(id) {
   if (!confirm('Xóa khuyến mãi?')) return;
-  saveToStorage('promotions', getPromotions().filter(p => p.id !== id));
+
+  try {
+    const res = await fetch(`/api/promotions/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      let errorMsg = 'Lỗi xóa thông tin từ database.';
+      try {
+        const errData = await res.json();
+        if (errData.message) errorMsg = errData.message;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+  } catch (err) {
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      console.warn('Backend API offline, using localStorage fallback', err);
+    } else {
+      alert('Không thể xóa khỏi database:\n' + err.message);
+      return;
+    }
+  }
+
+  const updatedPromos = getPromotions().map(p => p.id === id ? { ...p, status: 'inactive' } : p);
+  saveToStorage('promotions', updatedPromos);
   location.reload();
 }
 

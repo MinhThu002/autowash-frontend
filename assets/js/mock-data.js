@@ -18,9 +18,9 @@ const MOCK_DATA = {
   ],
 
   vehicles: [
-    { id: 'veh-001', customerId: 'cust-001', licensePlate: '51A-12345', vehicleType: 'Car', brand: 'Toyota Camry', color: 'Trắng', notes: 'Xe gia đình' },
-    { id: 'veh-002', customerId: 'cust-001', licensePlate: '59-H1 6789', vehicleType: 'Motorbike', brand: 'Honda Vision', color: 'Đỏ', notes: '' },
-    { id: 'veh-003', customerId: 'cust-002', licensePlate: '30F-98765', vehicleType: 'Car', brand: 'Hyundai Tucson', color: 'Xám', notes: '' }
+    { id: 'veh-001', vehicleId: 1, customerId: 'cust-001', licensePlate: '51A-12345', vehicleType: 'Car', brand: 'Toyota Camry', color: 'Trắng', notes: 'Xe gia đình', isActive: true },
+    { id: 'veh-002', vehicleId: 2, customerId: 'cust-001', licensePlate: '59-H1 6789', vehicleType: 'Motorbike', brand: 'Honda Vision', color: 'Đỏ', notes: '', isActive: true },
+    { id: 'veh-003', vehicleId: 3, customerId: 'cust-002', licensePlate: '30F-98765', vehicleType: 'Car', brand: 'Hyundai Tucson', color: 'Xám', notes: '', isActive: true }
   ],
 
   services: [
@@ -190,11 +190,31 @@ function getActiveVehicles() {
   return getVehicles().filter(v => v.isActive !== false);
 }
 
+function numId(value) {
+  if (value == null) return null;
+  const match = String(value).match(/\d+/);
+  return match ? Number(match[0]) : null;
+}
+
+function getLoggedInCustomerId() {
+  const stored = localStorage.getItem('autowash_user');
+  if (!stored) return null;
+  try {
+    const user = JSON.parse(stored);
+    const raw = user.customerId ?? user.id;
+    if (raw == null) return null;
+    const numeric = Number(raw);
+    return Number.isFinite(numeric) ? numeric : numId(raw);
+  } catch (e) {
+    return null;
+  }
+}
+
 function normalizeVehicle(vehicle) {
-  const id = vehicle.vehicleId ?? vehicle.id;
+  const vehicleId = vehicle.vehicleId ?? numId(vehicle.id) ?? vehicle.id;
   return {
-    id,
-    vehicleId: vehicle.vehicleId ?? (String(id).match(/\d+/) ? Number(String(id).match(/\d+/)[0]) : id),
+    id: vehicleId,
+    vehicleId,
     customerId: vehicle.customerId,
     licensePlate: vehicle.licensePlate,
     vehicleType: vehicle.vehicleType,
@@ -205,25 +225,34 @@ function normalizeVehicle(vehicle) {
   };
 }
 
+function buildVehicleRequest(customerId, fields) {
+  return {
+    customerId: Number(customerId),
+    licensePlate: fields.licensePlate,
+    vehicleType: fields.vehicleType,
+    brand: fields.brand,
+    color: fields.color || ''
+  };
+}
+
 function usesRealApi() {
   return window.AutoWashAPI && window.AutoWashConfig && window.AutoWashConfig.useMock === false;
 }
 
 async function fetchCustomerVehicles(customerId) {
-  if (usesRealApi()) {
-    const list = await window.AutoWashAPI.vehicles.byCustomer(customerId);
-    return (Array.isArray(list) ? list : []).map(normalizeVehicle);
+  if (!window.AutoWashAPI) {
+    throw new Error('API chưa sẵn sàng.');
   }
 
-  return getActiveVehicles()
-    .filter(v => String(v.customerId) === String(customerId) || numId(v.customerId) === Number(customerId))
-    .map(normalizeVehicle);
-}
+  const id = customerId ?? getLoggedInCustomerId();
+  if (!id) {
+    throw new Error('Chưa xác định được customer đang đăng nhập.');
+  }
 
-function numId(value) {
-  if (value == null) return null;
-  const match = String(value).match(/\d+/);
-  return match ? Number(match[0]) : null;
+  const list = await window.AutoWashAPI.vehicles.byCustomer(id);
+  return (Array.isArray(list) ? list : [])
+    .filter(v => v.isActive !== false)
+    .map(normalizeVehicle);
 }
 
 function getServices() {

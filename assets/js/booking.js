@@ -1,6 +1,7 @@
 /* AutoWash Pro - Booking */
 let selectedTimeSlot = null;
 let selectedPromotionId = null;
+let bookingVehicles = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.getElementById('bookingForm')) return;
@@ -10,26 +11,26 @@ document.addEventListener('DOMContentLoaded', () => {
 function initBookingPage() {
   const customer = getCurrentCustomer();
   const tier = getTierById(customer.tier);
-  const user = JSON.parse(localStorage.getItem('autowash_user') || 'null');
-  const customerId = user?.customerId || user?.id || customer.id;
 
-  fetchCustomerVehicles(customerId)
+  fetchCustomerVehicles(getLoggedInCustomerId())
     .then(vehicles => populateBookingVehicles(vehicles, customer, tier))
-    .catch(() => {
-      const vehicles = getActiveVehicles().filter(v => v.customerId === customer.id);
-      populateBookingVehicles(vehicles.map(normalizeVehicle), customer, tier);
+    .catch(error => {
+      showToast(error.message || 'Không tải được danh sách xe.');
+      populateBookingVehicles([], customer, tier);
     });
 }
 
 function populateBookingVehicles(vehicles, customer, tier) {
-  const services = getServices().filter(s => s.active);
+  bookingVehicles = vehicles.filter(v => v.isActive !== false);
+
   const vehicleSelect = document.getElementById('bookingVehicle');
   vehicleSelect.innerHTML = '<option value="">-- Chọn xe --</option>';
-  vehicles.filter(v => v.isActive !== false).forEach(v => {
+  bookingVehicles.forEach(v => {
     const opt = document.createElement('option');
-    opt.value = v.id;
+    opt.value = v.vehicleId;
     opt.textContent = `${v.licensePlate} - ${v.brand} (${v.vehicleType})`;
     opt.dataset.type = v.vehicleType;
+    opt.dataset.plate = v.licensePlate;
     vehicleSelect.appendChild(opt);
   });
 
@@ -59,7 +60,6 @@ function populateBookingVehicles(vehicles, customer, tier) {
     selectedPromotionId = e.target.value || null;
     updatePriceSummary();
   });
-
   document.getElementById('bookingForm').addEventListener('submit', confirmBooking);
 }
 
@@ -71,62 +71,54 @@ function updateServiceOptions() {
   getServices().filter(s => s.active && s.vehicleType === vehicleType).forEach(s => {
     const opt = document.createElement('option');
     opt.value = s.id;
-    opt.textContent = `${s.name} - ${formatCurrency(s.price)} (${s.duration} phút)`;
-    opt.dataset.price = s.price;
+    opt.textContent = `${s.name} - ${formatCurrency(s.price)}`;
     serviceSelect.appendChild(opt);
   });
 }
 
 function renderTimeSlots() {
   const container = document.getElementById('timeSlots');
-  if (!container) return;
-  container.innerHTML = '';
+  const slots = MOCK_DATA.timeSlots;
   selectedTimeSlot = null;
-  MOCK_DATA.timeSlots.forEach(slot => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'time-slot';
-    btn.textContent = slot;
-    btn.addEventListener('click', () => {
-      container.querySelectorAll('.time-slot').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      selectedTimeSlot = slot;
-    });
-    container.appendChild(btn);
-  });
+  container.innerHTML = slots.map(slot => `
+    <button type="button" class="time-slot" data-time="${slot}" onclick="selectTimeSlot('${slot}', this)">${slot}</button>
+  `).join('');
+}
+
+function selectTimeSlot(time, btn) {
+  selectedTimeSlot = time;
+  document.querySelectorAll('.time-slot').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
 }
 
 function renderPromotions(customer) {
-  const select = document.getElementById('bookingPromotion');
-  if (!select) return;
+  const tier = getTierById(customer.tier);
   const promos = getPromotions().filter(p => {
     if (p.status !== 'active') return false;
     if (p.targetTier === 'all') return true;
-    const tierOrder = ['member', 'silver', 'gold', 'platinum'];
-    return tierOrder.indexOf(customer.tier) >= tierOrder.indexOf(p.targetTier);
+    const tierOrder = { member: 1, silver: 2, gold: 3, platinum: 4 };
+    return tierOrder[p.targetTier] <= tierOrder[tier.id];
   });
-  promos.forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    const disc = p.discountType === 'percent' ? `${p.discountValue}%` : formatCurrency(p.discountValue);
-    opt.textContent = `${p.name} (-${disc})`;
-    select.appendChild(opt);
-  });
+  const select = document.getElementById('bookingPromotion');
+  if (!select) return;
+  select.innerHTML = '<option value="">Không áp dụng</option>' +
+    promos.map(p => `<option value="${p.id}">${p.name} (-${p.discountValue}${p.discountType === 'percent' ? '%' : 'đ'})</option>`).join('');
 }
 
 function updatePriceSummary() {
   const customer = getCurrentCustomer();
   const tier = getTierById(customer.tier);
-  const serviceOpt = document.getElementById('bookingService').selectedOptions[0];
-  const basePrice = parseFloat(serviceOpt?.dataset.price) || 0;
-  let discount = basePrice * (tier.discountPercent / 100);
-  let promoDiscount = 0;
+  const serviceId = document.getElementById('bookingService').value;
+  const service = getServices().find(s => s.id === serviceId);
+  const basePrice = service ? service.price : 0;
+  const discount = Math.round(basePrice * tier.discount / 100);
 
+  let promoDiscount = 0;
   if (selectedPromotionId) {
     const promo = getPromotions().find(p => p.id === selectedPromotionId);
     if (promo) {
       promoDiscount = promo.discountType === 'percent'
-        ? (basePrice - discount) * (promo.discountValue / 100)
+        ? Math.round(basePrice * promo.discountValue / 100)
         : promo.discountValue;
     }
   }
@@ -153,8 +145,13 @@ function confirmBooking(e) {
     return;
   }
 
-  const vehicle = getVehicles().find(v => v.id === vehicleId);
+  const vehicle = bookingVehicles.find(v => String(v.vehicleId) === String(vehicleId));
   const service = getServices().find(s => s.id === serviceId);
+  if (!vehicle || !service) {
+    showToast('Thông tin xe hoặc dịch vụ không hợp lệ.');
+    return;
+  }
+
   const totalText = document.getElementById('summaryTotal').textContent;
   const bookings = getBookings();
   const newId = `BK-2026-${String(bookings.length + 1).padStart(3, '0')}`;
@@ -163,14 +160,14 @@ function confirmBooking(e) {
     id: newId,
     customerId: customer.id,
     customerName: customer.name,
-    vehicleId,
+    vehicleId: vehicle.vehicleId,
     vehiclePlate: vehicle.licensePlate,
     serviceId,
     serviceName: service.name,
     date,
     time: selectedTimeSlot,
     status: 'pending',
-    totalPrice: parseInt(totalText.replace(/\D/g, '')) || service.price,
+    totalPrice: parseInt(totalText.replace(/\D/g, ''), 10) || service.price,
     pointsEarned: 0,
     promotionId: selectedPromotionId
   });

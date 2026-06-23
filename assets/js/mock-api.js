@@ -368,7 +368,7 @@
         brand: body.brand || '',
         color: body.color || '',
         notes: body.notes || '',
-        isActive: body.isActive !== false
+        isActive: true
       };
       vehicles.push(item);
       save('vehicles', vehicles);
@@ -376,7 +376,7 @@
     }
 
     const id = Number(parts[1]);
-    const index = vehicles.findIndex(v => numId(v.id) === id);
+    const index = vehicles.findIndex(v => numId(v.vehicleId || v.id) === id);
     if (index < 0) return fail('Vehicle not found');
 
     if (method === 'PUT') {
@@ -386,8 +386,7 @@
         licensePlate: body.licensePlate,
         vehicleType: body.vehicleType,
         brand: body.brand || '',
-        color: body.color || '',
-        isActive: body.isActive !== undefined ? body.isActive !== false : vehicles[index].isActive !== false
+        color: body.color || ''
       };
       save('vehicles', vehicles);
       return respond(toBackendVehicle(vehicles[index]));
@@ -629,7 +628,10 @@
       profile: (customerId) => request(`/api/customers/profile?customerId=${customerId}`)
     },
     vehicles: {
-      byCustomer: (customerId) => request(`/api/vehicles/customer?customerId=${customerId}`),
+      byCustomer: (customerId) => {
+        const id = customerId ?? (typeof getLoggedInCustomerId === 'function' ? getLoggedInCustomerId() : null);
+        return request(`/api/vehicles/customer?customerId=${id}`);
+      },
       create: (payload) => request('/api/vehicles', { method: 'POST', body: payload }),
       update: (id, payload) => request(`/api/vehicles/${id}`, { method: 'PUT', body: payload }),
       remove: (id) => request(`/api/vehicles/${id}`, { method: 'DELETE' })

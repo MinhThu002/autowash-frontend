@@ -90,11 +90,11 @@ function renderVehiclesPage() {
   const customer = getCurrentCustomer();
   setUserNav(customer);
   const list = document.getElementById('vehiclesList');
-  const customerId = user.customerId || user.id;
+  const customerId = getLoggedInCustomerId();
 
   list.innerHTML = '<div class="empty-state"><p>Đang tải danh sách xe...</p></div>';
 
-  fetchCustomerVehicles(customerId)
+  return fetchCustomerVehicles(customerId)
     .then(vehicles => {
       if (!vehicles.length) {
         list.innerHTML = '<div class="empty-state"><div class="icon">🚗</div><p>Chưa có xe nào. Thêm xe để đặt lịch.</p></div>';
@@ -102,15 +102,15 @@ function renderVehiclesPage() {
       }
 
       list.innerHTML = vehicles.map(v => `
-        <div class="vehicle-card" data-id="${v.id}">
+        <div class="vehicle-card" data-id="${v.vehicleId}">
           <div class="vehicle-card-info">
             <h4>${v.licensePlate}</h4>
             <p>${v.brand} • ${v.vehicleType} • ${v.color}</p>
             ${v.notes ? `<p class="text-muted">${v.notes}</p>` : ''}
           </div>
           <div class="actions">
-            <button class="btn btn-sm btn-secondary" onclick="editVehicle('${v.id}')">Sửa</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteVehicle('${v.id}')">Xóa</button>
+            <button class="btn btn-sm btn-secondary" onclick="editVehicle(${v.vehicleId})">Sửa</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteVehicle(${v.vehicleId})">Xóa</button>
           </div>
         </div>`).join('');
     })
@@ -125,105 +125,78 @@ async function saveVehicle(e) {
   const user = requireAuth(['customer']);
   if (!user) return;
 
-  const customerId = Number(user.customerId || user.id);
-  const id = document.getElementById('vehicleId').value;
-  const payload = {
-    customerId,
+  const customerId = getLoggedInCustomerId();
+  const vehicleId = document.getElementById('vehicleId').value;
+  const payload = buildVehicleRequest(customerId, {
     licensePlate: document.getElementById('vehiclePlate').value.trim(),
     vehicleType: document.getElementById('vehicleType').value,
     brand: document.getElementById('vehicleBrand').value.trim(),
     color: document.getElementById('vehicleColor').value.trim()
-  };
+  });
 
   if (!payload.licensePlate || !payload.brand) {
     showToast('Vui lòng nhập biển số và hãng xe.');
     return;
   }
 
-  if (usesRealApi()) {
-    try {
-      if (id) {
-        await window.AutoWashAPI.vehicles.update(Number(id), payload);
-      } else {
-        await window.AutoWashAPI.vehicles.create(payload);
-      }
-      closeModal('vehicleModal');
-      showToast(id ? 'Cập nhật xe thành công!' : 'Thêm xe thành công!');
-      renderVehiclesPage();
-    } catch (error) {
-      showToast(error.message || 'Lưu xe thất bại.');
-    }
+  if (!window.AutoWashAPI) {
+    showToast('API chưa sẵn sàng.');
     return;
   }
 
-  const customer = getCurrentCustomer();
-  const data = {
-    id: id || 'veh-' + Date.now(),
-    customerId: customer.id,
-    licensePlate: payload.licensePlate,
-    vehicleType: payload.vehicleType,
-    brand: payload.brand,
-    color: payload.color,
-    notes: document.getElementById('vehicleNotes').value.trim(),
-    isActive: true
-  };
-
-  let vehicles = getVehicles();
-  if (id) {
-    vehicles = vehicles.map(v => v.id === id ? { ...v, ...data } : v);
-  } else {
-    vehicles.push(data);
+  try {
+    if (vehicleId) {
+      await window.AutoWashAPI.vehicles.update(Number(vehicleId), payload);
+    } else {
+      await window.AutoWashAPI.vehicles.create(payload);
+    }
+    closeModal('vehicleModal');
+    showToast(vehicleId ? 'Cập nhật xe thành công!' : 'Thêm xe thành công!');
+    await renderVehiclesPage();
+  } catch (error) {
+    showToast(error.message || 'Lưu xe thất bại.');
   }
-  saveToStorage('vehicles', vehicles);
-  closeModal('vehicleModal');
-  showToast(id ? 'Cập nhật xe thành công!' : 'Thêm xe thành công!');
-  renderVehiclesPage();
 }
 
 async function editVehicle(id) {
   const user = requireAuth(['customer']);
   if (!user) return;
 
-  let v;
+  let vehicle;
   try {
-    const vehicles = await fetchCustomerVehicles(user.customerId || user.id);
-    v = vehicles.find(x => String(x.id) === String(id));
+    const vehicles = await fetchCustomerVehicles(getLoggedInCustomerId());
+    vehicle = vehicles.find(x => Number(x.vehicleId) === Number(id));
   } catch (error) {
     showToast(error.message || 'Không tải được thông tin xe.');
     return;
   }
 
-  if (!v) return;
+  if (!vehicle) return;
   document.getElementById('vehicleModalTitle').textContent = 'Sửa xe';
-  document.getElementById('vehicleId').value = v.id;
-  document.getElementById('vehiclePlate').value = v.licensePlate;
-  document.getElementById('vehicleType').value = v.vehicleType;
-  document.getElementById('vehicleBrand').value = v.brand;
-  document.getElementById('vehicleColor').value = v.color;
-  document.getElementById('vehicleNotes').value = v.notes || '';
+  document.getElementById('vehicleId').value = vehicle.vehicleId;
+  document.getElementById('vehiclePlate').value = vehicle.licensePlate;
+  document.getElementById('vehicleType').value = vehicle.vehicleType;
+  document.getElementById('vehicleBrand').value = vehicle.brand;
+  document.getElementById('vehicleColor').value = vehicle.color;
+  document.getElementById('vehicleNotes').value = vehicle.notes || '';
   openModal('vehicleModal');
 }
 
 async function deleteVehicle(id) {
   if (!confirm('Bạn có chắc muốn xóa xe này?')) return;
 
-  if (usesRealApi()) {
-    try {
-      await window.AutoWashAPI.vehicles.remove(Number(id));
-      showToast('Đã xóa xe.');
-      renderVehiclesPage();
-    } catch (error) {
-      showToast(error.message || 'Xóa xe thất bại.');
-    }
+  if (!window.AutoWashAPI) {
+    showToast('API chưa sẵn sàng.');
     return;
   }
 
-  const vehicles = getVehicles().map(v => (
-    String(v.id) === String(id) ? { ...v, isActive: false } : v
-  ));
-  saveToStorage('vehicles', vehicles);
-  showToast('Đã xóa xe.');
-  renderVehiclesPage();
+  try {
+    await window.AutoWashAPI.vehicles.remove(Number(id));
+    showToast('Đã xóa xe.');
+    await renderVehiclesPage();
+  } catch (error) {
+    showToast(error.message || 'Xóa xe thất bại.');
+  }
 }
 
 function openAddVehicle() {

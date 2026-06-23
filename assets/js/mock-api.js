@@ -45,7 +45,10 @@
       'POST /api/auth/reset-password',
       'POST /api/auth/google'
     ],
-    customers: ['GET /api/customers/profile?customerId=1'],
+    customers: [
+      'GET /api/customers',
+      'GET /api/customers/profile?customerId=1'
+    ],
     vehicles: [
       'GET /api/vehicles/customer?customerId=1',
       'POST /api/vehicles',
@@ -77,6 +80,12 @@
       'GET /api/dashboard/analytics',
       'GET /api/staff/schedule',
       'PATCH /api/staff/schedule/{id}/status'
+    ],
+    rewards: [
+      'GET /api/rewards/admin/all',
+      'POST /api/rewards/admin/create',
+      'PUT /api/rewards/admin/update/{id}',
+      'DELETE /api/rewards/admin/delete/{id}'
     ]
   };
 
@@ -144,6 +153,9 @@
         isActive: true
       })));
     }
+    if (!localStorage.getItem('autowash_rewardCatalog')) {
+      save('rewardCatalog', MOCK_DATA.rewardCatalog);
+    }
   }
 
   function addMinutes(time, minutes) {
@@ -176,14 +188,33 @@
     };
   }
 
+  function toBackendCustomerList(customer) {
+    const tierMap = { member: 'BRONZE', silver: 'SILVER', gold: 'GOLD', platinum: 'DIAMOND' };
+    const tierKey = customer.tier || customer.currentTier || 'member';
+    return {
+      fullName: customer.fullName || customer.name,
+      phoneNumber: customer.phoneNumber || customer.phone,
+      email: customer.email,
+      loyaltyTier: customer.loyaltyTier || tierMap[tierKey] || String(tierKey).toUpperCase(),
+      currentPoints: Number(customer.currentPoints ?? customer.points ?? 0),
+      totalVisits: Number(customer.totalVisits ?? 0),
+      totalSpend: Number(customer.totalSpend ?? customer.totalSpending ?? 0)
+    };
+  }
+
   function toBackendVehicle(vehicle) {
     return {
       vehicleId: numId(vehicle.vehicleId || vehicle.id),
       licensePlate: vehicle.licensePlate,
       vehicleType: vehicle.vehicleType,
       brand: vehicle.brand,
-      color: vehicle.color
+      color: vehicle.color,
+      isActive: vehicle.isActive !== false
     };
+  }
+
+  function isVehicleActive(vehicle) {
+    return vehicle.isActive !== false;
   }
 
   function toBackendWashService(service) {
@@ -332,6 +363,11 @@
   }
 
   function handleCustomers(method, parts, params) {
+    if (method === 'GET' && parts.length === 1) {
+      const customers = load('customers', MOCK_DATA.customers);
+      return respond(customers.map(toBackendCustomerList));
+    }
+
     if (method === 'GET' && parts[1] === 'profile') {
       const customerId = params.get('customerId');
       const customer = load('customers', MOCK_DATA.customers).find(c => numId(c.id) === Number(customerId));
@@ -345,19 +381,25 @@
 
     if (method === 'GET' && parts[1] === 'customer') {
       const customerId = Number(params.get('customerId'));
-      return respond(vehicles.filter(v => numId(v.customerId) === customerId).map(toBackendVehicle));
+      return respond(
+        vehicles
+          .filter(v => numId(v.customerId) === customerId && isVehicleActive(v))
+          .map(toBackendVehicle)
+      );
     }
 
     if (method === 'POST' && parts.length === 1) {
       const id = nextNumber(vehicles, 'vehicleId', 'id');
       const item = {
         id: legacyId('veh', id),
+        vehicleId: id,
         customerId: legacyId('cust', body.customerId),
         licensePlate: body.licensePlate,
         vehicleType: body.vehicleType,
         brand: body.brand || '',
         color: body.color || '',
-        notes: body.notes || ''
+        notes: body.notes || '',
+        isActive: true
       };
       vehicles.push(item);
       save('vehicles', vehicles);
@@ -365,7 +407,7 @@
     }
 
     const id = Number(parts[1]);
-    const index = vehicles.findIndex(v => numId(v.id) === id);
+    const index = vehicles.findIndex(v => numId(v.vehicleId || v.id) === id);
     if (index < 0) return fail('Vehicle not found');
 
     if (method === 'PUT') {
@@ -382,9 +424,96 @@
     }
 
     if (method === 'DELETE') {
-      vehicles = vehicles.filter(v => numId(v.id) !== id);
+      vehicles[index] = { ...vehicles[index], isActive: false };
       save('vehicles', vehicles);
       return respond(`Vehicle deleted successfully with ID: ${id}`);
+    }
+
+    return null;
+  }
+
+  function toBackendReward(reward) {
+    return {
+      rewardId: numId(reward.rewardId || reward.id),
+      rewardName: reward.rewardName || reward.name,
+      description: reward.description || '',
+      pointsRequired: Number(reward.pointsRequired ?? reward.pointsCost ?? 0),
+      discountAmount: Number(reward.discountAmount ?? 0),
+      stockQuantity: Number(reward.stockQuantity ?? 0),
+      isActive: reward.isActive !== false
+    };
+  }
+
+  function handleRewards(method, parts, body) {
+    let rewards = load('rewardCatalog', MOCK_DATA.rewardCatalog);
+
+    if (method === 'GET' && parts[1] === 'admin' && parts[2] === 'all') {
+      return respond(
+        [...rewards]
+          .sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired))
+          .map(toBackendReward)
+      );
+    }
+
+    if (method === 'GET' && parts[1] === 'customer' && parts[2] === 'catalog') {
+      return respond(
+        rewards
+          .filter(r => r.isActive !== false && Number(r.stockQuantity) > 0)
+          .sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired))
+          .map(toBackendReward)
+      );
+    }
+
+    if (method === 'POST' && parts[1] === 'admin' && parts[2] === 'create') {
+      if (!body.rewardName || body.pointsRequired == null || body.discountAmount == null || body.stockQuantity == null) {
+        return fail('Reward name, points, discount amount and stock quantity are required');
+      }
+      if (rewards.some(r => r.rewardName === body.rewardName)) {
+        return fail('Reward name already exists!');
+      }
+
+      const rewardId = nextNumber(rewards, 'rewardId', 'id');
+      const item = {
+        rewardId,
+        rewardName: body.rewardName,
+        description: body.description || '',
+        pointsRequired: Number(body.pointsRequired),
+        discountAmount: Number(body.discountAmount),
+        stockQuantity: Number(body.stockQuantity),
+        isActive: body.isActive !== false
+      };
+      rewards.push(item);
+      save('rewardCatalog', rewards);
+      return respond(toBackendReward(item), 201);
+    }
+
+    const id = Number(parts[3]);
+    const index = rewards.findIndex(r => numId(r.rewardId || r.id) === id);
+
+    if (method === 'PUT' && parts[1] === 'admin' && parts[2] === 'update') {
+      if (index < 0) return fail('Reward not found with ID: ' + id);
+      if (rewards.some(r => r.rewardName === body.rewardName && numId(r.rewardId || r.id) !== id)) {
+        return fail('Reward name is already taken!');
+      }
+
+      rewards[index] = {
+        ...rewards[index],
+        rewardName: body.rewardName,
+        description: body.description || '',
+        pointsRequired: Number(body.pointsRequired),
+        discountAmount: Number(body.discountAmount),
+        stockQuantity: Number(body.stockQuantity),
+        isActive: body.isActive !== undefined ? body.isActive !== false : rewards[index].isActive !== false
+      };
+      save('rewardCatalog', rewards);
+      return respond(toBackendReward(rewards[index]));
+    }
+
+    if (method === 'DELETE' && parts[1] === 'admin' && parts[2] === 'delete') {
+      if (index < 0) return fail('Reward not found');
+      rewards[index] = { ...rewards[index], isActive: false };
+      save('rewardCatalog', rewards);
+      return respond('Deactivated reward item success.');
     }
 
     return null;
@@ -565,6 +694,7 @@
     if (resource === 'admin' && parts[1] === 'wash-services') return handleWashServices(method, parts, body);
     if (resource === 'admin' && parts[1] === 'time-slots') return handleTimeSlots(method, parts, body);
     if (resource === 'promotions') return handlePromotions(method, parts, body);
+    if (resource === 'rewards') return handleRewards(method, parts, body);
     if (resource === 'bookings') return handleBookings(method, parts, body);
 
     return handleDemo(method, parts, body) || fail(`Mock API does not support ${method} ${pathname}`, 404);
@@ -614,10 +744,14 @@
       loginWithGoogle: (token) => request('/api/auth/google', { method: 'POST', body: { token } })
     },
     customers: {
+      getAll: () => request('/api/customers'),
       profile: (customerId) => request(`/api/customers/profile?customerId=${customerId}`)
     },
     vehicles: {
-      byCustomer: (customerId) => request(`/api/vehicles/customer?customerId=${customerId}`),
+      byCustomer: (customerId) => {
+        const id = customerId ?? (typeof getLoggedInCustomerId === 'function' ? getLoggedInCustomerId() : null);
+        return request(`/api/vehicles/customer?customerId=${id}`);
+      },
       create: (payload) => request('/api/vehicles', { method: 'POST', body: payload }),
       update: (id, payload) => request(`/api/vehicles/${id}`, { method: 'PUT', body: payload }),
       remove: (id) => request(`/api/vehicles/${id}`, { method: 'DELETE' })
@@ -639,6 +773,12 @@
       create: (payload) => request('/api/promotions', { method: 'POST', body: payload }),
       update: (id, payload) => request(`/api/promotions/${id}`, { method: 'PUT', body: payload }),
       remove: (id) => request(`/api/promotions/${id}`, { method: 'DELETE' })
+    },
+    rewards: {
+      getAll: () => request('/api/rewards/admin/all'),
+      create: (payload) => request('/api/rewards/admin/create', { method: 'POST', body: payload }),
+      update: (id, payload) => request(`/api/rewards/admin/update/${id}`, { method: 'PUT', body: payload }),
+      delete: (id) => request(`/api/rewards/admin/delete/${id}`, { method: 'DELETE' })
     },
     bookings: {
       list: () => request('/api/bookings'),

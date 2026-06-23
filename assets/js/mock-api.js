@@ -77,6 +77,12 @@
       'GET /api/dashboard/analytics',
       'GET /api/staff/schedule',
       'PATCH /api/staff/schedule/{id}/status'
+    ],
+    rewards: [
+      'GET /api/rewards/admin/all',
+      'POST /api/rewards/admin/create',
+      'PUT /api/rewards/admin/update/{id}',
+      'DELETE /api/rewards/admin/delete/{id}'
     ]
   };
 
@@ -143,6 +149,9 @@
         maxCapacity: 3,
         isActive: true
       })));
+    }
+    if (!localStorage.getItem('autowash_rewardCatalog')) {
+      save('rewardCatalog', MOCK_DATA.rewardCatalog);
     }
   }
 
@@ -401,6 +410,93 @@
     return null;
   }
 
+  function toBackendReward(reward) {
+    return {
+      rewardId: numId(reward.rewardId || reward.id),
+      rewardName: reward.rewardName || reward.name,
+      description: reward.description || '',
+      pointsRequired: Number(reward.pointsRequired ?? reward.pointsCost ?? 0),
+      discountAmount: Number(reward.discountAmount ?? 0),
+      stockQuantity: Number(reward.stockQuantity ?? 0),
+      isActive: reward.isActive !== false
+    };
+  }
+
+  function handleRewards(method, parts, body) {
+    let rewards = load('rewardCatalog', MOCK_DATA.rewardCatalog);
+
+    if (method === 'GET' && parts[1] === 'admin' && parts[2] === 'all') {
+      return respond(
+        [...rewards]
+          .sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired))
+          .map(toBackendReward)
+      );
+    }
+
+    if (method === 'GET' && parts[1] === 'customer' && parts[2] === 'catalog') {
+      return respond(
+        rewards
+          .filter(r => r.isActive !== false && Number(r.stockQuantity) > 0)
+          .sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired))
+          .map(toBackendReward)
+      );
+    }
+
+    if (method === 'POST' && parts[1] === 'admin' && parts[2] === 'create') {
+      if (!body.rewardName || body.pointsRequired == null || body.discountAmount == null || body.stockQuantity == null) {
+        return fail('Reward name, points, discount amount and stock quantity are required');
+      }
+      if (rewards.some(r => r.rewardName === body.rewardName)) {
+        return fail('Reward name already exists!');
+      }
+
+      const rewardId = nextNumber(rewards, 'rewardId', 'id');
+      const item = {
+        rewardId,
+        rewardName: body.rewardName,
+        description: body.description || '',
+        pointsRequired: Number(body.pointsRequired),
+        discountAmount: Number(body.discountAmount),
+        stockQuantity: Number(body.stockQuantity),
+        isActive: body.isActive !== false
+      };
+      rewards.push(item);
+      save('rewardCatalog', rewards);
+      return respond(toBackendReward(item), 201);
+    }
+
+    const id = Number(parts[3]);
+    const index = rewards.findIndex(r => numId(r.rewardId || r.id) === id);
+
+    if (method === 'PUT' && parts[1] === 'admin' && parts[2] === 'update') {
+      if (index < 0) return fail('Reward not found with ID: ' + id);
+      if (rewards.some(r => r.rewardName === body.rewardName && numId(r.rewardId || r.id) !== id)) {
+        return fail('Reward name is already taken!');
+      }
+
+      rewards[index] = {
+        ...rewards[index],
+        rewardName: body.rewardName,
+        description: body.description || '',
+        pointsRequired: Number(body.pointsRequired),
+        discountAmount: Number(body.discountAmount),
+        stockQuantity: Number(body.stockQuantity),
+        isActive: body.isActive !== undefined ? body.isActive !== false : rewards[index].isActive !== false
+      };
+      save('rewardCatalog', rewards);
+      return respond(toBackendReward(rewards[index]));
+    }
+
+    if (method === 'DELETE' && parts[1] === 'admin' && parts[2] === 'delete') {
+      if (index < 0) return fail('Reward not found');
+      rewards[index] = { ...rewards[index], isActive: false };
+      save('rewardCatalog', rewards);
+      return respond('Deactivated reward item success.');
+    }
+
+    return null;
+  }
+
   function handleWashServices(method, parts, body) {
     let services = load('services', MOCK_DATA.services);
     const id = Number(parts[2]);
@@ -576,6 +672,7 @@
     if (resource === 'admin' && parts[1] === 'wash-services') return handleWashServices(method, parts, body);
     if (resource === 'admin' && parts[1] === 'time-slots') return handleTimeSlots(method, parts, body);
     if (resource === 'promotions') return handlePromotions(method, parts, body);
+    if (resource === 'rewards') return handleRewards(method, parts, body);
     if (resource === 'bookings') return handleBookings(method, parts, body);
 
     return handleDemo(method, parts, body) || fail(`Mock API does not support ${method} ${pathname}`, 404);
@@ -653,6 +750,12 @@
       create: (payload) => request('/api/promotions', { method: 'POST', body: payload }),
       update: (id, payload) => request(`/api/promotions/${id}`, { method: 'PUT', body: payload }),
       remove: (id) => request(`/api/promotions/${id}`, { method: 'DELETE' })
+    },
+    rewards: {
+      getAll: () => request('/api/rewards/admin/all'),
+      create: (payload) => request('/api/rewards/admin/create', { method: 'POST', body: payload }),
+      update: (id, payload) => request(`/api/rewards/admin/update/${id}`, { method: 'PUT', body: payload }),
+      delete: (id) => request(`/api/rewards/admin/delete/${id}`, { method: 'DELETE' })
     },
     bookings: {
       list: () => request('/api/bookings'),

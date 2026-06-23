@@ -39,6 +39,7 @@ function adminSidebar(active) {
     ['admin-services.html', '🔧', 'Dịch vụ'],
     ['admin-loyalty-tiers.html', '🏆', 'Hạng TV'],
     ['admin-promotions.html', '🎁', 'Khuyến mãi'],
+    ['admin-rewards.html', '🎖️', 'Quà tặng'],
     ['admin-analytics.html', '📈', 'Analytics']
   ];
   const links = items.map(([h, ic, lb]) =>

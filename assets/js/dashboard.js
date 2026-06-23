@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'admin-services': renderAdminServices,
     'admin-loyalty-tiers': renderAdminTiers,
     'admin-promotions': renderAdminPromotions,
+    'admin-rewards': renderAdminRewards,
     'admin-analytics': renderAdminAnalytics,
     'staff-schedule': renderStaffSchedule
   };
@@ -384,6 +385,43 @@ function renderAdminPromotions() {
   });
 }
 
+function renderAdminRewards() {
+  const user = requireAuth(['admin']);
+  if (!user) return;
+
+  const tbody = document.querySelector('#rewardsTable tbody');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="8">Đang tải danh sách quà tặng...</td></tr>';
+
+  fetchAdminRewards()
+    .then(rewards => {
+      if (!rewards.length) {
+        tbody.innerHTML = '<tr><td colspan="8">Chưa có quà tặng nào.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rewards.map(r => `
+        <tr data-id="${r.rewardId}">
+          <td>${r.rewardId}</td>
+          <td><strong>${r.rewardName}</strong></td>
+          <td>${r.description || '-'}</td>
+          <td>${r.pointsRequired.toLocaleString('vi-VN')}</td>
+          <td>${formatCurrency(r.discountAmount)}</td>
+          <td>${r.stockQuantity}</td>
+          <td>${getStatusBadge(r.isActive ? 'active' : 'inactive')}</td>
+          <td class="actions">
+            <button class="btn btn-sm btn-secondary" onclick="editReward(${r.rewardId})">Sửa</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteReward(${r.rewardId})">Xóa</button>
+          </td>
+        </tr>`).join('');
+    })
+    .catch(error => {
+      tbody.innerHTML = '<tr><td colspan="8">Không tải được danh sách quà tặng.</td></tr>';
+      showToast(error.message || 'Không tải được danh sách quà tặng.');
+    });
+}
+
 function renderAdminAnalytics() {
   const d = MOCK_DATA.analyticsData;
   renderBarChart('analyticsRevenue', d.monthlyRevenue.slice(-6), ['T7','T8','T9','T10','T11','T12']);
@@ -473,6 +511,7 @@ function initCrudModals(page) {
   document.getElementById('vehicleForm')?.addEventListener('submit', saveVehicle);
   document.getElementById('serviceForm')?.addEventListener('submit', saveService);
   document.getElementById('promotionForm')?.addEventListener('submit', savePromotion);
+  document.getElementById('rewardForm')?.addEventListener('submit', saveReward);
 }
 
 function saveService(e) {
@@ -570,4 +609,93 @@ function openAddPromotion() {
   document.getElementById('promotionForm').reset();
   document.getElementById('promoId').value = '';
   openModal('promotionModal');
+}
+
+async function saveReward(e) {
+  e.preventDefault();
+  if (!requireAuth(['admin'])) return;
+
+  const rewardId = document.getElementById('rewardId').value;
+  const payload = buildRewardRequest({
+    rewardName: document.getElementById('rewardName').value.trim(),
+    description: document.getElementById('rewardDescription').value.trim(),
+    pointsRequired: document.getElementById('rewardPoints').value,
+    discountAmount: document.getElementById('rewardDiscount').value,
+    stockQuantity: document.getElementById('rewardStock').value,
+    isActive: document.getElementById('rewardActive').value
+  });
+
+  if (!payload.rewardName || payload.pointsRequired < 1) {
+    showToast('Vui lòng nhập tên quà và điểm đổi hợp lệ.');
+    return;
+  }
+
+  if (!window.AutoWashAPI) {
+    showToast('API chưa sẵn sàng.');
+    return;
+  }
+
+  try {
+    if (rewardId) {
+      await window.AutoWashAPI.rewards.update(Number(rewardId), payload);
+    } else {
+      await window.AutoWashAPI.rewards.create(payload);
+    }
+    closeModal('rewardModal');
+    showToast(rewardId ? 'Cập nhật quà tặng thành công!' : 'Thêm quà tặng thành công!');
+    await renderAdminRewards();
+  } catch (error) {
+    showToast(error.message || 'Lưu quà tặng thất bại.');
+  }
+}
+
+async function editReward(id) {
+  if (!requireAuth(['admin'])) return;
+
+  let reward;
+  try {
+    const rewards = await fetchAdminRewards();
+    reward = rewards.find(r => Number(r.rewardId) === Number(id));
+  } catch (error) {
+    showToast(error.message || 'Không tải được thông tin quà tặng.');
+    return;
+  }
+
+  if (!reward) return;
+
+  document.getElementById('rewardModalTitle').textContent = 'Sửa quà tặng';
+  document.getElementById('rewardId').value = reward.rewardId;
+  document.getElementById('rewardName').value = reward.rewardName;
+  document.getElementById('rewardDescription').value = reward.description || '';
+  document.getElementById('rewardPoints').value = reward.pointsRequired;
+  document.getElementById('rewardDiscount').value = reward.discountAmount;
+  document.getElementById('rewardStock').value = reward.stockQuantity;
+  document.getElementById('rewardActive').value = reward.isActive ? 'true' : 'false';
+  openModal('rewardModal');
+}
+
+async function deleteReward(id) {
+  if (!requireAuth(['admin'])) return;
+  if (!confirm('Bạn có chắc muốn vô hiệu hóa quà tặng này?')) return;
+
+  if (!window.AutoWashAPI) {
+    showToast('API chưa sẵn sàng.');
+    return;
+  }
+
+  try {
+    await window.AutoWashAPI.rewards.delete(Number(id));
+    showToast('Đã vô hiệu hóa quà tặng.');
+    await renderAdminRewards();
+  } catch (error) {
+    showToast(error.message || 'Xóa quà tặng thất bại.');
+  }
+}
+
+function openAddReward() {
+  document.getElementById('rewardForm').reset();
+  document.getElementById('rewardId').value = '';
+  document.getElementById('rewardModalTitle').textContent = 'Thêm quà tặng';
+  document.getElementById('rewardActive').value = 'true';
+  openModal('rewardModal');
 }

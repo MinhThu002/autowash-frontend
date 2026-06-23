@@ -64,6 +64,13 @@ const MOCK_DATA = {
     { id: 'rw-003', name: 'Nâng cấp rửa cao cấp', pointsCost: 1500, description: 'Giảm 100% phí chênh lệch lên cao cấp' }
   ],
 
+  rewardCatalog: [
+    { rewardId: 1, rewardName: 'Voucher giảm 50.000đ', description: 'Áp dụng 1 lần cho bất kỳ dịch vụ', pointsRequired: 500, discountAmount: 50000, stockQuantity: 100, isActive: true },
+    { rewardId: 2, rewardName: 'Rửa nhanh miễn phí (xe máy)', description: 'Miễn phí 1 lần rửa nhanh xe máy', pointsRequired: 800, discountAmount: 80000, stockQuantity: 50, isActive: true },
+    { rewardId: 3, rewardName: 'Nâng cấp rửa cao cấp', description: 'Giảm 100% phí chênh lệch lên cao cấp', pointsRequired: 1500, discountAmount: 200000, stockQuantity: 20, isActive: true },
+    { rewardId: 4, rewardName: 'Voucher cũ (ngừng)', description: 'Quà đã ngừng phát hành', pointsRequired: 300, discountAmount: 30000, stockQuantity: 0, isActive: false }
+  ],
+
   timeSlots: ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30'],
 
   analyticsData: {
@@ -174,6 +181,7 @@ function initStorage() {
     saveToStorage('bookings', MOCK_DATA.bookings);
     saveToStorage('services', MOCK_DATA.services);
     saveToStorage('promotions', MOCK_DATA.promotions);
+    saveToStorage('rewardCatalog', MOCK_DATA.rewardCatalog);
     localStorage.setItem('autowash_initialized', 'true');
   }
 }
@@ -253,6 +261,38 @@ async function fetchCustomerVehicles(customerId) {
   return (Array.isArray(list) ? list : [])
     .filter(v => v.isActive !== false)
     .map(normalizeVehicle);
+}
+
+function normalizeReward(reward) {
+  return {
+    rewardId: reward.rewardId ?? numId(reward.id),
+    rewardName: reward.rewardName || reward.name || '',
+    description: reward.description || '',
+    pointsRequired: Number(reward.pointsRequired ?? reward.pointsCost ?? 0),
+    discountAmount: Number(reward.discountAmount ?? 0),
+    stockQuantity: Number(reward.stockQuantity ?? 0),
+    isActive: reward.isActive !== false
+  };
+}
+
+function buildRewardRequest(fields) {
+  return {
+    rewardName: fields.rewardName,
+    description: fields.description || '',
+    pointsRequired: Number(fields.pointsRequired),
+    discountAmount: Number(fields.discountAmount),
+    stockQuantity: Number(fields.stockQuantity),
+    isActive: fields.isActive === true || fields.isActive === 'true'
+  };
+}
+
+async function fetchAdminRewards() {
+  if (!window.AutoWashAPI) {
+    throw new Error('API chưa sẵn sàng.');
+  }
+
+  const list = await window.AutoWashAPI.rewards.getAll();
+  return (Array.isArray(list) ? list : []).map(normalizeReward);
 }
 
 function getServices() {

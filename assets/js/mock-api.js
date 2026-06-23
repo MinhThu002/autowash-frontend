@@ -182,8 +182,13 @@
       licensePlate: vehicle.licensePlate,
       vehicleType: vehicle.vehicleType,
       brand: vehicle.brand,
-      color: vehicle.color
+      color: vehicle.color,
+      isActive: vehicle.isActive !== false
     };
+  }
+
+  function isVehicleActive(vehicle) {
+    return vehicle.isActive !== false;
   }
 
   function toBackendWashService(service) {
@@ -345,19 +350,25 @@
 
     if (method === 'GET' && parts[1] === 'customer') {
       const customerId = Number(params.get('customerId'));
-      return respond(vehicles.filter(v => numId(v.customerId) === customerId).map(toBackendVehicle));
+      return respond(
+        vehicles
+          .filter(v => numId(v.customerId) === customerId && isVehicleActive(v))
+          .map(toBackendVehicle)
+      );
     }
 
     if (method === 'POST' && parts.length === 1) {
       const id = nextNumber(vehicles, 'vehicleId', 'id');
       const item = {
         id: legacyId('veh', id),
+        vehicleId: id,
         customerId: legacyId('cust', body.customerId),
         licensePlate: body.licensePlate,
         vehicleType: body.vehicleType,
         brand: body.brand || '',
         color: body.color || '',
-        notes: body.notes || ''
+        notes: body.notes || '',
+        isActive: body.isActive !== false
       };
       vehicles.push(item);
       save('vehicles', vehicles);
@@ -375,14 +386,15 @@
         licensePlate: body.licensePlate,
         vehicleType: body.vehicleType,
         brand: body.brand || '',
-        color: body.color || ''
+        color: body.color || '',
+        isActive: body.isActive !== undefined ? body.isActive !== false : vehicles[index].isActive !== false
       };
       save('vehicles', vehicles);
       return respond(toBackendVehicle(vehicles[index]));
     }
 
     if (method === 'DELETE') {
-      vehicles = vehicles.filter(v => numId(v.id) !== id);
+      vehicles[index] = { ...vehicles[index], isActive: false };
       save('vehicles', vehicles);
       return respond(`Vehicle deleted successfully with ID: ${id}`);
     }

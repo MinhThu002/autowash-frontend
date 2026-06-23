@@ -10,11 +10,22 @@ document.addEventListener('DOMContentLoaded', () => {
 function initBookingPage() {
   const customer = getCurrentCustomer();
   const tier = getTierById(customer.tier);
-  const vehicles = getVehicles().filter(v => v.customerId === customer.id);
-  const services = getServices().filter(s => s.active);
+  const user = JSON.parse(localStorage.getItem('autowash_user') || 'null');
+  const customerId = user?.customerId || user?.id || customer.id;
 
+  fetchCustomerVehicles(customerId)
+    .then(vehicles => populateBookingVehicles(vehicles, customer, tier))
+    .catch(() => {
+      const vehicles = getActiveVehicles().filter(v => v.customerId === customer.id);
+      populateBookingVehicles(vehicles.map(normalizeVehicle), customer, tier);
+    });
+}
+
+function populateBookingVehicles(vehicles, customer, tier) {
+  const services = getServices().filter(s => s.active);
   const vehicleSelect = document.getElementById('bookingVehicle');
-  vehicles.forEach(v => {
+  vehicleSelect.innerHTML = '<option value="">-- Chọn xe --</option>';
+  vehicles.filter(v => v.isActive !== false).forEach(v => {
     const opt = document.createElement('option');
     opt.value = v.id;
     opt.textContent = `${v.licensePlate} - ${v.brand} (${v.vehicleType})`;

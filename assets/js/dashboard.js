@@ -84,47 +84,90 @@ function renderCustomerDashboard() {
 }
 
 function renderVehiclesPage() {
+  const user = requireAuth(['customer']);
+  if (!user) return;
+
   const customer = getCurrentCustomer();
   setUserNav(customer);
   const list = document.getElementById('vehiclesList');
-  const vehicles = getVehicles().filter(v => v.customerId === customer.id);
+  const customerId = user.customerId || user.id;
 
-  if (!vehicles.length) {
-    list.innerHTML = '<div class="empty-state"><div class="icon">🚗</div><p>Chưa có xe nào. Thêm xe để đặt lịch.</p></div>';
-    return;
-  }
+  list.innerHTML = '<div class="empty-state"><p>Đang tải danh sách xe...</p></div>';
 
-  list.innerHTML = vehicles.map(v => `
-    <div class="vehicle-card" data-id="${v.id}">
-      <div class="vehicle-card-info">
-        <h4>${v.licensePlate}</h4>
-        <p>${v.brand} • ${v.vehicleType} • ${v.color}</p>
-        ${v.notes ? `<p class="text-muted">${v.notes}</p>` : ''}
-      </div>
-      <div class="actions">
-        <button class="btn btn-sm btn-secondary" onclick="editVehicle('${v.id}')">Sửa</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteVehicle('${v.id}')">Xóa</button>
-      </div>
-    </div>`).join('');
+  fetchCustomerVehicles(customerId)
+    .then(vehicles => {
+      if (!vehicles.length) {
+        list.innerHTML = '<div class="empty-state"><div class="icon">🚗</div><p>Chưa có xe nào. Thêm xe để đặt lịch.</p></div>';
+        return;
+      }
+
+      list.innerHTML = vehicles.map(v => `
+        <div class="vehicle-card" data-id="${v.id}">
+          <div class="vehicle-card-info">
+            <h4>${v.licensePlate}</h4>
+            <p>${v.brand} • ${v.vehicleType} • ${v.color}</p>
+            ${v.notes ? `<p class="text-muted">${v.notes}</p>` : ''}
+          </div>
+          <div class="actions">
+            <button class="btn btn-sm btn-secondary" onclick="editVehicle('${v.id}')">Sửa</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteVehicle('${v.id}')">Xóa</button>
+          </div>
+        </div>`).join('');
+    })
+    .catch(error => {
+      list.innerHTML = '<div class="empty-state"><p>Không tải được danh sách xe.</p></div>';
+      showToast(error.message || 'Không tải được danh sách xe.');
+    });
 }
 
-function saveVehicle(e) {
+async function saveVehicle(e) {
   e.preventDefault();
-  const customer = getCurrentCustomer();
+  const user = requireAuth(['customer']);
+  if (!user) return;
+
+  const customerId = Number(user.customerId || user.id);
   const id = document.getElementById('vehicleId').value;
-  const data = {
-    id: id || 'veh-' + Date.now(),
-    customerId: customer.id,
+  const payload = {
+    customerId,
     licensePlate: document.getElementById('vehiclePlate').value.trim(),
     vehicleType: document.getElementById('vehicleType').value,
     brand: document.getElementById('vehicleBrand').value.trim(),
-    color: document.getElementById('vehicleColor').value.trim(),
-    notes: document.getElementById('vehicleNotes').value.trim()
+    color: document.getElementById('vehicleColor').value.trim()
   };
-  if (!data.licensePlate || !data.brand) {
+
+  if (!payload.licensePlate || !payload.brand) {
     showToast('Vui lòng nhập biển số và hãng xe.');
     return;
   }
+
+  if (usesRealApi()) {
+    try {
+      if (id) {
+        await window.AutoWashAPI.vehicles.update(Number(id), payload);
+      } else {
+        await window.AutoWashAPI.vehicles.create(payload);
+      }
+      closeModal('vehicleModal');
+      showToast(id ? 'Cập nhật xe thành công!' : 'Thêm xe thành công!');
+      renderVehiclesPage();
+    } catch (error) {
+      showToast(error.message || 'Lưu xe thất bại.');
+    }
+    return;
+  }
+
+  const customer = getCurrentCustomer();
+  const data = {
+    id: id || 'veh-' + Date.now(),
+    customerId: customer.id,
+    licensePlate: payload.licensePlate,
+    vehicleType: payload.vehicleType,
+    brand: payload.brand,
+    color: payload.color,
+    notes: document.getElementById('vehicleNotes').value.trim(),
+    isActive: true
+  };
+
   let vehicles = getVehicles();
   if (id) {
     vehicles = vehicles.map(v => v.id === id ? { ...v, ...data } : v);
@@ -137,8 +180,19 @@ function saveVehicle(e) {
   renderVehiclesPage();
 }
 
-function editVehicle(id) {
-  const v = getVehicles().find(x => x.id === id);
+async function editVehicle(id) {
+  const user = requireAuth(['customer']);
+  if (!user) return;
+
+  let v;
+  try {
+    const vehicles = await fetchCustomerVehicles(user.customerId || user.id);
+    v = vehicles.find(x => String(x.id) === String(id));
+  } catch (error) {
+    showToast(error.message || 'Không tải được thông tin xe.');
+    return;
+  }
+
   if (!v) return;
   document.getElementById('vehicleModalTitle').textContent = 'Sửa xe';
   document.getElementById('vehicleId').value = v.id;
@@ -150,9 +204,24 @@ function editVehicle(id) {
   openModal('vehicleModal');
 }
 
-function deleteVehicle(id) {
+async function deleteVehicle(id) {
   if (!confirm('Bạn có chắc muốn xóa xe này?')) return;
-  saveToStorage('vehicles', getVehicles().filter(v => v.id !== id));
+
+  if (usesRealApi()) {
+    try {
+      await window.AutoWashAPI.vehicles.remove(Number(id));
+      showToast('Đã xóa xe.');
+      renderVehiclesPage();
+    } catch (error) {
+      showToast(error.message || 'Xóa xe thất bại.');
+    }
+    return;
+  }
+
+  const vehicles = getVehicles().map(v => (
+    String(v.id) === String(id) ? { ...v, isActive: false } : v
+  ));
+  saveToStorage('vehicles', vehicles);
   showToast('Đã xóa xe.');
   renderVehiclesPage();
 }

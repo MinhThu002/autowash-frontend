@@ -186,6 +186,46 @@ function getVehicles() {
   return loadFromStorage('vehicles', [...MOCK_DATA.vehicles]);
 }
 
+function getActiveVehicles() {
+  return getVehicles().filter(v => v.isActive !== false);
+}
+
+function normalizeVehicle(vehicle) {
+  const id = vehicle.vehicleId ?? vehicle.id;
+  return {
+    id,
+    vehicleId: vehicle.vehicleId ?? (String(id).match(/\d+/) ? Number(String(id).match(/\d+/)[0]) : id),
+    customerId: vehicle.customerId,
+    licensePlate: vehicle.licensePlate,
+    vehicleType: vehicle.vehicleType,
+    brand: vehicle.brand || '',
+    color: vehicle.color || '',
+    notes: vehicle.notes || '',
+    isActive: vehicle.isActive !== false
+  };
+}
+
+function usesRealApi() {
+  return window.AutoWashAPI && window.AutoWashConfig && window.AutoWashConfig.useMock === false;
+}
+
+async function fetchCustomerVehicles(customerId) {
+  if (usesRealApi()) {
+    const list = await window.AutoWashAPI.vehicles.byCustomer(customerId);
+    return (Array.isArray(list) ? list : []).map(normalizeVehicle);
+  }
+
+  return getActiveVehicles()
+    .filter(v => String(v.customerId) === String(customerId) || numId(v.customerId) === Number(customerId))
+    .map(normalizeVehicle);
+}
+
+function numId(value) {
+  if (value == null) return null;
+  const match = String(value).match(/\d+/);
+  return match ? Number(match[0]) : null;
+}
+
 function getServices() {
   return loadFromStorage('services', [...MOCK_DATA.services]);
 }

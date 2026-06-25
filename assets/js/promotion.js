@@ -3,14 +3,6 @@
    ========================================================================= */
 
 function mapBackendPromoToFrontend(p) {
-  let targetTier = 'all';
-  if (p.minTierName) {
-    const name = p.minTierName.toLowerCase();
-    if (name.includes('silver')) targetTier = 'silver';
-    else if (name.includes('gold')) targetTier = 'gold';
-    else if (name.includes('platinum') || name.includes('diamond')) targetTier = 'platinum';
-    else if (name.includes('member') || name.includes('bronze')) targetTier = 'member';
-  }
   const discountType = p.discountAmount <= 100 ? 'percent' : 'fixed';
   return {
     id: String(p.promoId),
@@ -20,7 +12,7 @@ function mapBackendPromoToFrontend(p) {
     discountValue: p.discountAmount,
     startDate: p.startDate,
     endDate: p.endDate,
-    targetTier: targetTier,
+    targetTier: p.minTierId ? String(p.minTierId) : 'all',
     usageLimit: 999,
     usedCount: 0,
     status: p.isActive ? 'active' : 'inactive'
@@ -28,11 +20,6 @@ function mapBackendPromoToFrontend(p) {
 }
 
 function mapFrontendPromoToBackend(p) {
-  let minTierId = null;
-  if (p.targetTier === 'silver') minTierId = 2;
-  else if (p.targetTier === 'gold') minTierId = 3;
-  else if (p.targetTier === 'platinum') minTierId = 4;
-  else if (p.targetTier === 'member') minTierId = 1;
   return {
     promoName: p.name,
     description: p.description,
@@ -40,7 +27,7 @@ function mapFrontendPromoToBackend(p) {
     startDate: p.startDate,
     endDate: p.endDate,
     isActive: p.status === 'active',
-    minTierId: minTierId
+    minTierId: p.targetTier === 'all' || !p.targetTier ? null : Number(p.targetTier)
   };
 }
 

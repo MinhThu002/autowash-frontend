@@ -27,20 +27,24 @@
     </header>
     <div class="page-content">
       <div class="page-header"><h2>Hạng thành viên</h2><button class="btn btn-primary" onclick="openAddLoyaltyTier()">+ Thêm hạng</button></div>
-<div class="card table-wrapper"><table class="table" id="tiersTable"><thead><tr><th>Hạng</th><th>Lượt</th><th>Chi tiêu</th><th>Tỷ lệ điểm</th><th>Cửa sổ đặt</th><th>Giảm %</th><th>Quyền lợi</th><th>TT</th><th></th></tr></thead><tbody></tbody></table></div>
+<div class="card table-wrapper"><table class="table" id="tiersTable"><thead><tr><th>Hạng</th><th>Chi tiêu tối thiểu</th><th>Lượt yêu cầu</th><th>Tỷ lệ điểm</th><th>Cửa sổ đặt (ngày)</th><th>Giảm %</th><th>Độ ưu tiên</th><th>TT</th><th></th></tr></thead><tbody></tbody></table></div>
 <div class="modal-overlay" id="tierModal"><div class="modal"><div class="modal-header"><h3>Hạng thành viên</h3><button class="modal-close" data-modal-close="tierModal">&times;</button></div>
 <form id="tierForm"><div class="modal-body">
+<input type="hidden" id="tierId">
+<div class="form-group"><label>Tên hạng</label><input id="tierName" required placeholder="Ví dụ: Silver, Gold"></div>
 <div class="form-row">
-  <div class="form-group"><label>Mã hạng (ID)</label><input id="tierId" required placeholder="Ví dụ: silver, gold, vip"></div>
-  <div class="form-group"><label>Tên hạng</label><input id="tierName" required placeholder="Ví dụ: Silver, Gold"></div>
+  <div class="form-group"><label>Chi tiêu tối thiểu (VND)</label><input type="number" id="tierMinSpending" required min="0"></div>
+  <div class="form-group"><label>Lượt yêu cầu</label><input type="number" id="tierMinVisits" required min="0"></div>
 </div>
-<div class="form-row"><div class="form-group"><label>Lượt yêu cầu</label><input type="number" id="tierRequiredVisits" required min="0"></div>
-<div class="form-group"><label>Chi tiêu yêu cầu (VND)</label><input type="number" id="tierRequiredSpending" required min="0"></div></div>
-<div class="form-row"><div class="form-group"><label>Tỷ lệ điểm</label><input type="number" step="0.1" id="tierPointRate" required min="1"></div>
-<div class="form-group"><label>Cửa sổ đặt lịch (ngày)</label><input type="number" id="tierBookingWindow" required min="1"></div></div>
-<div class="form-group"><label>Phần trăm giảm (%)</label><input type="number" id="tierDiscountPercent" required min="0" max="100"></div>
-<div class="form-group"><label>Quyền lợi (cách nhau bằng dấu phẩy)</label><textarea id="tierBenefits" placeholder="Quyền lợi 1, Quyền lợi 2"></textarea></div>
-<div class="form-group"><label>Trạng thái</label><select id="tierStatus"><option value="active">Hoạt động</option><option value="inactive">Ngừng</option></select></div>
+<div class="form-row">
+  <div class="form-group"><label>Tỷ lệ điểm</label><input type="number" step="0.1" id="tierPointMultiplier" required min="1"></div>
+  <div class="form-group"><label>Cửa sổ đặt lịch (ngày)</label><input type="number" id="tierBookingWindowDays" required min="1"></div>
+</div>
+<div class="form-row">
+  <div class="form-group"><label>Phần trăm giảm (%)</label><input type="number" id="tierDiscountPercent" required min="0" max="100"></div>
+  <div class="form-group"><label>Mức độ ưu tiên (số nguyên dương)</label><input type="number" id="tierPriorityLevel" required min="1"></div>
+</div>
+<div class="form-group"><label>Trạng thái</label><select id="tierIsActive"><option value="active">Hoạt động</option><option value="inactive">Ngừng</option></select></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-modal-close="tierModal">Hủy</button><button type="submit" class="btn btn-primary">Lưu</button></div></form></div></div>
 </div>
   </main>

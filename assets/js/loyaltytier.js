@@ -3,34 +3,29 @@
    ========================================================================= */
 
 function mapBackendTierToFrontend(t) {
-  let benefits = [];
-  if (Array.isArray(t.benefits)) {
-    benefits = t.benefits;
-  } else if (typeof t.benefits === 'string') {
-    benefits = t.benefits.split(',').map(b => b.trim()).filter(Boolean);
-  }
   return {
-    id: t.id || String(t.tierName || t.name || '').toLowerCase(),
+    id: String(t.tierId || t.id || ''),
+    tierId: t.tierId || t.id,
     name: t.tierName || t.name,
-    requiredVisits: Number(t.requiredVisits ?? 0),
-    requiredSpending: Number(t.requiredSpending ?? 0),
-    pointRate: Number(t.pointMultiplier || t.pointRate || 1),
-    bookingWindow: Number(t.bookingWindowDays || t.bookingWindow || 7),
+    minSpending: Number(t.minSpending ?? t.requiredSpending ?? 0),
+    minVisits: Number(t.minVisits ?? t.requiredVisits ?? 0),
+    pointMultiplier: Number(t.pointMultiplier || t.pointRate || 1),
+    bookingWindowDays: Number(t.bookingWindowDays || t.bookingWindow || 7),
+    priorityLevel: Number(t.priorityLevel ?? 1),
     discountPercent: Number(t.discountPercent ?? 0),
-    benefits: benefits,
     isActive: t.isActive ?? t.active ?? true
   };
 }
 
 function mapFrontendTierToBackend(t) {
   return {
-    tierName: t.name,
-    requiredVisits: t.requiredVisits,
-    requiredSpending: t.requiredSpending,
-    pointMultiplier: t.pointRate,
-    bookingWindowDays: t.bookingWindow,
-    discountPercent: t.discountPercent,
-    benefits: Array.isArray(t.benefits) ? t.benefits.join(', ') : (t.benefits || ''),
+    tierName: t.name || t.tierName,
+    minSpending: Number(t.minSpending),
+    minVisits: Number(t.minVisits),
+    pointMultiplier: Number(t.pointMultiplier),
+    bookingWindowDays: Number(t.bookingWindowDays),
+    priorityLevel: Number(t.priorityLevel),
+    discountPercent: Number(t.discountPercent),
     isActive: t.isActive ?? true
   };
 }
@@ -90,46 +85,42 @@ function openAddLoyaltyTier() {
   if (form) form.reset();
   const idInput = document.getElementById('tierId');
   if (idInput) {
-    idInput.readOnly = false;
-    idInput.placeholder = "Ví dụ: silver, gold, vip";
+    idInput.value = '';
   }
   openModal('tierModal');
 }
 
 function editLoyaltyTier(id) {
-  const tier = MOCK_DATA.loyaltyTiers.find(t => t.id === id);
+  const tier = MOCK_DATA.loyaltyTiers.find(t => String(t.id || t.tierId) === String(id));
   if (!tier) return;
 
   const idInput = document.getElementById('tierId');
   if (idInput) {
-    idInput.value = tier.id;
-    idInput.readOnly = true;
+    idInput.value = tier.tierId || tier.id || '';
   }
   
   const nameInput = document.getElementById('tierName');
-  if (nameInput) nameInput.value = tier.name;
+  if (nameInput) nameInput.value = tier.name || tier.tierName || '';
 
-  const visitsInput = document.getElementById('tierRequiredVisits');
-  if (visitsInput) visitsInput.value = tier.requiredVisits;
+  const minSpendingInput = document.getElementById('tierMinSpending');
+  if (minSpendingInput) minSpendingInput.value = tier.minSpending ?? tier.requiredSpending ?? 0;
 
-  const spendingInput = document.getElementById('tierRequiredSpending');
-  if (spendingInput) spendingInput.value = tier.requiredSpending;
+  const minVisitsInput = document.getElementById('tierMinVisits');
+  if (minVisitsInput) minVisitsInput.value = tier.minVisits ?? tier.requiredVisits ?? 0;
 
-  const pointRateInput = document.getElementById('tierPointRate');
-  if (pointRateInput) pointRateInput.value = tier.pointRate;
+  const pointMultiplierInput = document.getElementById('tierPointMultiplier');
+  if (pointMultiplierInput) pointMultiplierInput.value = tier.pointMultiplier ?? tier.pointRate ?? 1;
 
-  const windowInput = document.getElementById('tierBookingWindow');
-  if (windowInput) windowInput.value = tier.bookingWindow;
+  const bookingWindowDaysInput = document.getElementById('tierBookingWindowDays');
+  if (bookingWindowDaysInput) bookingWindowDaysInput.value = tier.bookingWindowDays ?? tier.bookingWindow ?? 7;
 
-  const discountInput = document.getElementById('tierDiscountPercent');
-  if (discountInput) discountInput.value = tier.discountPercent;
+  const discountPercentInput = document.getElementById('tierDiscountPercent');
+  if (discountPercentInput) discountPercentInput.value = tier.discountPercent ?? 0;
 
-  const benefitsInput = document.getElementById('tierBenefits');
-  if (benefitsInput) {
-    benefitsInput.value = Array.isArray(tier.benefits) ? tier.benefits.join(', ') : (tier.benefits || '');
-  }
+  const priorityLevelInput = document.getElementById('tierPriorityLevel');
+  if (priorityLevelInput) priorityLevelInput.value = tier.priorityLevel ?? 1;
 
-  const statusInput = document.getElementById('tierStatus');
+  const statusInput = document.getElementById('tierIsActive');
   if (statusInput) {
     const activeStatus = tier.isActive ?? tier.active ?? true;
     statusInput.value = activeStatus ? 'active' : 'inactive';
@@ -164,7 +155,7 @@ async function deleteLoyaltyTier(id) {
 
   // Fallback / sync local storage
   MOCK_DATA.loyaltyTiers = MOCK_DATA.loyaltyTiers.map(t => {
-    if (t.id === id) {
+    if (String(t.id || t.tierId) === String(id)) {
       return { ...t, isActive: false, active: false };
     }
     return t;
@@ -177,30 +168,28 @@ async function deleteLoyaltyTier(id) {
 async function saveLoyaltyTier(e) {
   e.preventDefault();
 
-  const id = document.getElementById('tierId').value.trim().toLowerCase();
+  const id = document.getElementById('tierId').value;
   const data = {
-    id: id,
+    id: id ? Number(id) : null,
+    tierId: id ? Number(id) : null,
     name: document.getElementById('tierName').value.trim(),
-    requiredVisits: parseInt(document.getElementById('tierRequiredVisits').value),
-    requiredSpending: parseInt(document.getElementById('tierRequiredSpending').value),
-    pointRate: parseFloat(document.getElementById('tierPointRate').value),
-    bookingWindow: parseInt(document.getElementById('tierBookingWindow').value),
+    minSpending: parseFloat(document.getElementById('tierMinSpending').value),
+    minVisits: parseInt(document.getElementById('tierMinVisits').value),
+    pointMultiplier: parseFloat(document.getElementById('tierPointMultiplier').value),
+    bookingWindowDays: parseInt(document.getElementById('tierBookingWindowDays').value),
     discountPercent: parseInt(document.getElementById('tierDiscountPercent').value),
-    benefits: document.getElementById('tierBenefits').value.split(',').map(b => b.trim()).filter(Boolean),
-    isActive: document.getElementById('tierStatus').value === 'active'
+    priorityLevel: parseInt(document.getElementById('tierPriorityLevel').value),
+    isActive: document.getElementById('tierIsActive').value === 'active'
   };
 
-  const isExisting = MOCK_DATA.loyaltyTiers.some(t => t.id === id);
+  const isExisting = id ? true : false;
 
   try {
     const url = isExisting ? `/api/loyalty-tiers/${id}` : '/api/loyalty-tiers';
     const method = isExisting ? 'PUT' : 'POST';
     const backendData = mapFrontendTierToBackend(data);
-    // Include id for PUT request if required by backend, or let endpoint resolve it
     if (isExisting) {
-      backendData.id = id;
-    } else {
-      backendData.id = id; // Add ID to creation payload if backend expects it
+      backendData.tierId = Number(id);
     }
 
     const res = await fetch(url, {
@@ -226,10 +215,12 @@ async function saveLoyaltyTier(e) {
     }
   }
 
-  // Update MOCK_DATA and localStorage
+  // Update MOCK_DATA and localStorage offline fallback
   if (isExisting) {
-    MOCK_DATA.loyaltyTiers = MOCK_DATA.loyaltyTiers.map(t => t.id === id ? { ...t, ...data } : t);
+    MOCK_DATA.loyaltyTiers = MOCK_DATA.loyaltyTiers.map(t => String(t.id || t.tierId) === String(id) ? { ...t, ...data } : t);
   } else {
+    data.id = String(Date.now());
+    data.tierId = Date.now();
     MOCK_DATA.loyaltyTiers.push(data);
   }
   localStorage.setItem('autowash_loyaltyTiers', JSON.stringify(MOCK_DATA.loyaltyTiers));

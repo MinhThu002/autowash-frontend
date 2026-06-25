@@ -322,30 +322,45 @@ function renderAdminTiers() {
   tbody.innerHTML = '';
   MOCK_DATA.loyaltyTiers.forEach(t => {
     const activeStatus = t.isActive ?? t.active ?? true;
-    tbody.innerHTML += `<tr data-id="${t.id}">
-      <td><strong>${t.name}</strong></td>
-      <td>${t.requiredVisits}</td>
-      <td>${formatCurrency(t.requiredSpending)}</td>
-      <td>x${t.pointRate}</td>
-      <td>${t.bookingWindow} ngày</td>
+    tbody.innerHTML += `<tr data-id="${t.id || t.tierId}">
+      <td><strong>${t.name || t.tierName}</strong></td>
+      <td>${formatCurrency(t.minSpending ?? t.requiredSpending ?? 0)}</td>
+      <td>${t.minVisits ?? t.requiredVisits ?? 0} lượt</td>
+      <td>x${t.pointMultiplier ?? t.pointRate ?? 1}</td>
+      <td>${t.bookingWindowDays ?? t.bookingWindow ?? 7} ngày</td>
       <td>${t.discountPercent}%</td>
-      <td>${Array.isArray(t.benefits) ? t.benefits.join(', ') : (t.benefits || '')}</td>
+      <td>${t.priorityLevel ?? 1}</td>
       <td>${getStatusBadge(activeStatus ? 'active' : 'inactive')}</td>
       <td class="actions">
-        <button class="btn btn-sm btn-secondary" onclick="editLoyaltyTier('${t.id}')">Sửa</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteLoyaltyTier('${t.id}')">Xóa</button>
+        <button class="btn btn-sm btn-secondary" onclick="editLoyaltyTier('${t.id || t.tierId}')">Sửa</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteLoyaltyTier('${t.id || t.tierId}')">Xóa</button>
       </td></tr>`;
   });
 }
 
 function renderAdminPromotions() {
   const tbody = document.querySelector('#promotionsTable tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const select = document.getElementById('promoTier');
+  if (select) {
+    select.innerHTML = '<option value="all">Tất cả</option>';
+    MOCK_DATA.loyaltyTiers.forEach(t => {
+      const activeStatus = t.isActive ?? t.active ?? true;
+      if (activeStatus) {
+        select.innerHTML += `<option value="${t.id || t.tierId}">${t.name || t.tierName}+</option>`;
+      }
+    });
+  }
+
   getPromotions().forEach(p => {
     const disc = p.discountType === 'percent' ? `${p.discountValue}%` : formatCurrency(p.discountValue);
+    const tierName = p.targetTier === 'all' || !p.targetTier ? 'Tất cả' : (getTierById(p.targetTier)?.name || 'Tất cả');
     tbody.innerHTML += `<tr data-id="${p.id}">
       <td><strong>${p.name}</strong></td><td>${p.description}</td><td>${disc}</td>
       <td>${formatDate(p.startDate)}</td><td>${formatDate(p.endDate)}</td>
-      <td>${p.targetTier === 'all' ? 'Tất cả' : getTierById(p.targetTier).name}</td>
+      <td>${tierName}</td>
       <td>${getStatusBadge(p.status)}</td>
       <td class="actions">
         <button class="btn btn-sm btn-secondary" onclick="editPromotion('${p.id}')">Sửa</button>

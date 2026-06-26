@@ -165,13 +165,13 @@
   }
 
   function tierIdFromName(tier) {
-    const order = { member: 1, silver: 2, gold: 3, platinum: 4 };
+    const order = { member: 1, bronze: 1, silver: 2, gold: 3, platinum: 4, diamond: 4 };
     return order[String(tier || 'member').toLowerCase()] || 1;
   }
 
   function tierNameFromId(id) {
-    const tier = MOCK_DATA.loyaltyTiers[id - 1];
-    return tier ? tier.name : 'All Tiers';
+    const tier = MOCK_DATA.dbLoyaltyTiers.find(t => t.tierId === Number(id));
+    return tier ? tier.tierName : 'All Tiers';
   }
 
   function toBackendCustomer(customer) {
@@ -253,7 +253,9 @@
   }
 
   function toBackendPromotion(promotion) {
-    const minTierId = promotion.minTierId || (promotion.targetTier === 'all' ? null : tierIdFromName(promotion.targetTier));
+    const minTierId = promotion.minTierId != null
+      ? Number(promotion.minTierId)
+      : (promotion.targetTier === 'all' || !promotion.targetTier ? null : tierIdFromName(promotion.targetTier));
     return {
       promoId: numId(promotion.promoId || promotion.id),
       promoName: promotion.promoName || promotion.name,
@@ -269,7 +271,6 @@
 
   function fromBackendPromotion(body, existing) {
     const minTierId = body.minTierId == null ? null : Number(body.minTierId);
-    const tierIds = { 1: 'member', 2: 'silver', 3: 'gold', 4: 'platinum' };
     return {
       ...(existing || {}),
       id: existing?.id || legacyId('promo', body.promoId || Date.now()),
@@ -279,7 +280,7 @@
       discountValue: Number(body.discountAmount ?? body.discountValue ?? 0),
       startDate: body.startDate,
       endDate: body.endDate,
-      targetTier: minTierId ? tierIds[minTierId] : 'all',
+      minTierId,
       usageLimit: body.usageLimit || existing?.usageLimit || 100,
       usedCount: existing?.usedCount || 0,
       status: body.status || 'active'

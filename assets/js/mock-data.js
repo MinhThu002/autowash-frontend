@@ -2,6 +2,13 @@
 const MOCK_DATA = {
   currentCustomerId: 'cust-001',
 
+  dbLoyaltyTiers: [
+    { tierId: 1, tierName: 'BRONZE' },
+    { tierId: 2, tierName: 'SILVER' },
+    { tierId: 3, tierName: 'GOLD' },
+    { tierId: 4, tierName: 'DIAMOND' }
+  ],
+
   loyaltyTiers: [
     { id: 'member', name: 'Member', requiredVisits: 0, requiredSpending: 0, pointRate: 1, bookingWindow: 7, discountPercent: 0, benefits: ['Đặt lịch trước 7 ngày', 'Tích điểm cơ bản'] },
     { id: 'silver', name: 'Silver', requiredVisits: 5, requiredSpending: 500000, pointRate: 1.2, bookingWindow: 10, discountPercent: 5, benefits: ['Giảm 5%', 'Đặt lịch 10 ngày', 'Ưu tiên xếp hàng nhẹ'] },
@@ -43,11 +50,11 @@ const MOCK_DATA = {
   ],
 
   promotions: [
-    { id: 'promo-001', name: 'Chào hè 2026', description: 'Giảm giá mùa hè cho tất cả dịch vụ ô tô', discountType: 'percent', discountValue: 15, startDate: '2026-05-01', endDate: '2026-08-31', targetTier: 'all', usageLimit: 500, usedCount: 128, status: 'active' },
-    { id: 'promo-002', name: 'Gold Member Exclusive', description: 'Giảm thêm cho hạng Gold trở lên', discountType: 'percent', discountValue: 10, startDate: '2026-04-01', endDate: '2026-12-31', targetTier: 'gold', usageLimit: 200, usedCount: 45, status: 'active' },
-    { id: 'promo-003', name: 'Xe máy cuối tuần', description: 'Giảm 20k cho rửa xe máy T7-CN', discountType: 'fixed', discountValue: 20000, startDate: '2026-05-01', endDate: '2026-06-30', targetTier: 'all', usageLimit: 1000, usedCount: 312, status: 'active' },
-    { id: 'promo-004', name: 'Platinum VIP', description: 'Miễn phí wax nhẹ', discountType: 'fixed', discountValue: 50000, startDate: '2026-01-01', endDate: '2026-12-31', targetTier: 'platinum', usageLimit: 50, usedCount: 12, status: 'active' },
-    { id: 'promo-005', name: 'Tết 2025', description: 'Khuyến mãi đã kết thúc', discountType: 'percent', discountValue: 20, startDate: '2025-01-01', endDate: '2025-02-15', targetTier: 'all', usageLimit: 300, usedCount: 300, status: 'inactive' }
+    { id: 'promo-001', name: 'Chào hè 2026', description: 'Giảm giá mùa hè cho tất cả dịch vụ ô tô', discountType: 'percent', discountValue: 15, startDate: '2026-05-01', endDate: '2026-08-31', minTierId: null, usageLimit: 500, usedCount: 128, status: 'active' },
+    { id: 'promo-002', name: 'Gold Member Exclusive', description: 'Giảm thêm cho hạng Gold', discountType: 'percent', discountValue: 10, startDate: '2026-04-01', endDate: '2026-12-31', minTierId: 3, usageLimit: 200, usedCount: 45, status: 'active' },
+    { id: 'promo-003', name: 'Xe máy cuối tuần', description: 'Giảm 20k cho rửa xe máy T7-CN', discountType: 'fixed', discountValue: 20000, startDate: '2026-05-01', endDate: '2026-06-30', minTierId: null, usageLimit: 1000, usedCount: 312, status: 'active' },
+    { id: 'promo-004', name: 'Diamond VIP', description: 'Miễn phí wax nhẹ', discountType: 'fixed', discountValue: 50000, startDate: '2026-01-01', endDate: '2026-12-31', minTierId: 4, usageLimit: 50, usedCount: 12, status: 'active' },
+    { id: 'promo-005', name: 'Tết 2025', description: 'Khuyến mãi đã kết thúc', discountType: 'percent', discountValue: 20, startDate: '2025-01-01', endDate: '2025-02-15', minTierId: null, usageLimit: 300, usedCount: 300, status: 'inactive' }
   ],
 
   loyaltyTransactions: [
@@ -108,6 +115,37 @@ const MOCK_DATA = {
 
 function getTierById(tierId) {
   return MOCK_DATA.loyaltyTiers.find(t => t.id === tierId) || MOCK_DATA.loyaltyTiers[0];
+}
+
+function getDbTierById(tierId) {
+  return MOCK_DATA.dbLoyaltyTiers.find(t => t.tierId === Number(tierId)) || null;
+}
+
+function getDbTierName(minTierId) {
+  if (minTierId == null || minTierId === '') return 'Tất cả';
+  return getDbTierById(minTierId)?.tierName || 'Tất cả';
+}
+
+function tierKeyToId(tierKey) {
+  const map = { member: 1, bronze: 1, silver: 2, gold: 3, platinum: 4, diamond: 4 };
+  return map[normalizeTierKey(tierKey)] || 1;
+}
+
+function getPromotionMinTierId(promotion) {
+  if (promotion.minTierId != null && promotion.minTierId !== '') {
+    return Number(promotion.minTierId);
+  }
+  if (!promotion.targetTier || promotion.targetTier === 'all') return null;
+  return tierKeyToId(promotion.targetTier);
+}
+
+function populatePromotionTierSelect(selectEl, selectedValue) {
+  if (!selectEl) return;
+  selectEl.innerHTML = '<option value="">Tất cả</option>' +
+    MOCK_DATA.dbLoyaltyTiers.map(t => `<option value="${t.tierId}">${t.tierName}</option>`).join('');
+  if (selectedValue != null && selectedValue !== '') {
+    selectEl.value = String(selectedValue);
+  }
 }
 
 function getCustomerById(id) {

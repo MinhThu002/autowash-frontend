@@ -92,12 +92,12 @@ function selectTimeSlot(time, btn) {
 }
 
 function renderPromotions(customer) {
-  const tier = getTierById(customer.tier);
+  const customerTierId = tierKeyToId(customer.tier);
   const promos = getPromotions().filter(p => {
     if (p.status !== 'active') return false;
-    if (p.targetTier === 'all') return true;
-    const tierOrder = { member: 1, silver: 2, gold: 3, platinum: 4 };
-    return tierOrder[p.targetTier] <= tierOrder[tier.id];
+    const minTierId = getPromotionMinTierId(p);
+    if (minTierId == null) return true;
+    return minTierId === customerTierId;
   });
   const select = document.getElementById('bookingPromotion');
   if (!select) return;

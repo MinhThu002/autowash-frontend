@@ -273,7 +273,7 @@ function renderPromotionsPage() {
   const grid = document.getElementById('promotionsGrid');
   getPromotions().filter(p => p.status === 'active').forEach(p => {
     const disc = p.discountType === 'percent' ? `${p.discountValue}%` : formatCurrency(p.discountValue);
-    const tierLabel = p.targetTier === 'all' ? 'Tất cả hạng' : getTierById(p.targetTier).name;
+    const tierLabel = getDbTierName(getPromotionMinTierId(p));
     grid.innerHTML += `
       <div class="promotion-card">
         <h4>${p.name}</h4>
@@ -400,13 +400,15 @@ function renderAdminTiers() {
 }
 
 function renderAdminPromotions() {
+  populatePromotionTierSelect(document.getElementById('promoTier'));
+
   const tbody = document.querySelector('#promotionsTable tbody');
   getPromotions().forEach(p => {
     const disc = p.discountType === 'percent' ? `${p.discountValue}%` : formatCurrency(p.discountValue);
     tbody.innerHTML += `<tr data-id="${p.id}">
       <td><strong>${p.name}</strong></td><td>${p.description}</td><td>${disc}</td>
       <td>${formatDate(p.startDate)}</td><td>${formatDate(p.endDate)}</td>
-      <td>${p.targetTier === 'all' ? 'Tất cả' : getTierById(p.targetTier).name}</td>
+      <td>${getDbTierName(getPromotionMinTierId(p))}</td>
       <td>${p.usedCount}/${p.usageLimit}</td><td>${getStatusBadge(p.status)}</td>
       <td class="actions">
         <button class="btn btn-sm btn-secondary" onclick="editPromotion('${p.id}')">Sửa</button>
@@ -592,6 +594,8 @@ function openAddService() {
 function savePromotion(e) {
   e.preventDefault();
   const id = document.getElementById('promoId').value;
+  const tierValue = document.getElementById('promoTier').value;
+  const minTierId = tierValue === '' ? null : Number(tierValue);
   const data = {
     id: id || 'promo-' + Date.now(),
     name: document.getElementById('promoName').value,
@@ -600,7 +604,7 @@ function savePromotion(e) {
     discountValue: parseFloat(document.getElementById('promoDiscountValue').value),
     startDate: document.getElementById('promoStart').value,
     endDate: document.getElementById('promoEnd').value,
-    targetTier: document.getElementById('promoTier').value,
+    minTierId,
     usageLimit: parseInt(document.getElementById('promoLimit').value),
     usedCount: 0,
     status: document.getElementById('promoStatus').value
@@ -623,7 +627,7 @@ function editPromotion(id) {
   document.getElementById('promoDiscountValue').value = p.discountValue;
   document.getElementById('promoStart').value = p.startDate;
   document.getElementById('promoEnd').value = p.endDate;
-  document.getElementById('promoTier').value = p.targetTier;
+  populatePromotionTierSelect(document.getElementById('promoTier'), getPromotionMinTierId(p) ?? '');
   document.getElementById('promoLimit').value = p.usageLimit;
   document.getElementById('promoStatus').value = p.status;
   openModal('promotionModal');
@@ -638,6 +642,7 @@ function deletePromotion(id) {
 function openAddPromotion() {
   document.getElementById('promotionForm').reset();
   document.getElementById('promoId').value = '';
+  populatePromotionTierSelect(document.getElementById('promoTier'));
   openModal('promotionModal');
 }
 

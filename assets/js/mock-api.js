@@ -69,9 +69,18 @@
     ],
     promotions: [
       'GET /api/promotions',
+      'GET /api/promotions/active',
       'POST /api/promotions',
       'PUT /api/promotions/{id}',
       'DELETE /api/promotions/{id}'
+    ],
+    bookingsV1: [
+      'GET /api/v1/bookings',
+      'GET /api/v1/bookings/available-slots',
+      'POST /api/v1/bookings',
+      'PUT /api/v1/bookings/{id}/confirm-arrival',
+      'PUT /api/v1/bookings/{id}/complete',
+      'PUT /api/v1/bookings/{id}/cancel'
     ],
     demoExtensions: [
       'GET /api/bookings',
@@ -83,6 +92,10 @@
     ],
     rewards: [
       'GET /api/rewards/admin/all',
+      'GET /api/rewards/customer/catalog',
+      'GET /api/rewards/customer/history/{customerId}',
+      'GET /api/rewards/customer/unused/{customerId}',
+      'POST /api/rewards/customer/redeem',
       'POST /api/rewards/admin/create',
       'PUT /api/rewards/admin/update/{id}',
       'DELETE /api/rewards/admin/delete/{id}'
@@ -155,6 +168,21 @@
     }
     if (!localStorage.getItem('autowash_rewardCatalog')) {
       save('rewardCatalog', MOCK_DATA.rewardCatalog);
+    }
+    if (!localStorage.getItem('autowash_redemptions')) {
+      save('redemptions', []);
+    }
+    if (!localStorage.getItem('autowash_bookingRecords')) {
+      save('bookingRecords', MOCK_DATA.bookings.map((b, index) => ({
+        id: index + 1,
+        fullName: b.customerName,
+        licensePlate: b.vehiclePlate,
+        serviceName: b.serviceName,
+        bookingDate: b.date,
+        createdAt: `${b.time}:00`,
+        status: String(b.status || 'pending').toUpperCase(),
+        totalPrice: b.totalPrice
+      })));
     }
   }
 
@@ -465,6 +493,56 @@
       );
     }
 
+    if (method === 'POST' && parts[1] === 'customer' && parts[2] === 'redeem') {
+      const customerId = Number(body.customerId);
+      const rewardId = Number(body.rewardId);
+      const quantity = Number(body.quantity || 1);
+      const reward = rewards.find(r => numId(r.rewardId || r.id) === rewardId);
+      if (!reward || reward.isActive === false) return fail('Reward not found');
+      if (Number(reward.stockQuantity) < quantity) return fail('Not enough stock');
+
+      const customers = load('customers', MOCK_DATA.customers);
+      const customer = customers.find(c => numId(c.id) === customerId);
+      if (!customer) return fail('Customer not found');
+
+      const pointsNeeded = Number(reward.pointsRequired) * quantity;
+      if (Number(customer.points) < pointsNeeded) return fail('Not enough points');
+
+      customer.points -= pointsNeeded;
+      reward.stockQuantity = Number(reward.stockQuantity) - quantity;
+      save('customers', customers);
+      save('rewardCatalog', rewards);
+
+      let redemptions = load('redemptions', []);
+      const redemptionId = nextNumber(redemptions, 'redemptionId', 'id');
+      const item = {
+        redemptionId,
+        customerId,
+        pointsUsed: pointsNeeded,
+        redemptionDate: new Date().toISOString(),
+        rewardId,
+        rewardName: reward.rewardName || reward.name,
+        discountAmount: Number(reward.discountAmount || 0),
+        bookingId: null,
+        status: 'AVAILABLE'
+      };
+      redemptions.unshift(item);
+      save('redemptions', redemptions);
+      return respond(item, 201);
+    }
+
+    if (method === 'GET' && parts[1] === 'customer' && parts[2] === 'history') {
+      const customerId = Number(parts[3]);
+      const list = load('redemptions', []).filter(r => Number(r.customerId) === customerId);
+      return respond(list);
+    }
+
+    if (method === 'GET' && parts[1] === 'customer' && parts[2] === 'unused') {
+      const customerId = Number(parts[3]);
+      const list = load('redemptions', []).filter(r => Number(r.customerId) === customerId && !r.bookingId);
+      return respond(list);
+    }
+
     if (method === 'POST' && parts[1] === 'admin' && parts[2] === 'create') {
       if (!body.rewardName || body.pointsRequired == null || body.discountAmount == null || body.stockQuantity == null) {
         return fail('Reward name, points, discount amount and stock quantity are required');
@@ -525,6 +603,9 @@
     const id = Number(parts[2]);
 
     if (method === 'GET' && parts.length === 2) return respond(services.map(toBackendWashService));
+    if (method === 'GET' && parts[2] === 'active') {
+      return respond(services.filter(s => s.active !== false && s.isActive !== false).map(toBackendWashService));
+    }
 
     if (method === 'POST') {
       const serviceId = nextNumber(services, 'serviceId', 'id');
@@ -596,6 +677,9 @@
     const id = Number(parts[1]);
 
     if (method === 'GET' && parts.length === 1) return respond(promotions.map(toBackendPromotion));
+    if (method === 'GET' && parts[1] === 'active') {
+      return respond(promotions.filter(p => p.status !== 'inactive').map(toBackendPromotion));
+    }
 
     if (method === 'POST') {
       const promoId = nextNumber(promotions, 'promoId', 'id');
@@ -619,6 +703,105 @@
       promotions = promotions.filter(p => numId(p.id) !== id);
       save('promotions', promotions);
       return respond(`Promotion with ID ${id} has been deleted successfully!`);
+    }
+
+    return null;
+  }
+
+  function toBackendBookingRecord(record) {
+    return {
+      id: record.id,
+      fullName: record.fullName,
+      licensePlate: record.licensePlate,
+      serviceName: record.serviceName,
+      bookingDate: record.bookingDate,
+      createdAt: record.createdAt,
+      status: record.status,
+      totalPrice: record.totalPrice
+    };
+  }
+
+  function handleBookingsV1(method, parts, params, body) {
+    let records = load('bookingRecords', []);
+
+    if (method === 'GET' && parts[0] === 'available-slots') {
+      const date = params.get('date');
+      const washServiceId = Number(params.get('washServiceId'));
+      const slots = load('timeSlots', []);
+      const service = load('services', MOCK_DATA.services).find(s => numId(s.id) === washServiceId);
+      const duration = service?.duration || service?.durationMinutes || 30;
+      return respond(slots.filter(s => s.isActive !== false).map(slot => ({
+        slotId: slot.slotId,
+        slotName: slot.slotName,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        maxCapacity: slot.maxCapacity,
+        isAvailable: true
+      })));
+    }
+
+    if (method === 'GET' && parts.length === 0) {
+      return respond(records.map(toBackendBookingRecord));
+    }
+
+    if (method === 'POST' && parts.length === 0) {
+      const customer = load('customers', MOCK_DATA.customers).find(c => numId(c.id) === Number(body.customerId));
+      const vehicle = load('vehicles', MOCK_DATA.vehicles).find(v => numId(v.vehicleId || v.id) === Number(body.vehicleId));
+      const service = load('services', MOCK_DATA.services).find(s => numId(s.id) === Number(body.washServiceId));
+      const slot = load('timeSlots', []).find(s => Number(s.slotId) === Number(body.slotId));
+      if (!customer || !vehicle || !service) return fail('Invalid booking data');
+
+      const basePrice = Number(service.price || 0);
+      const id = nextNumber(records, 'id');
+      const record = {
+        id,
+        fullName: customer.name,
+        licensePlate: vehicle.licensePlate,
+        serviceName: service.name || service.serviceName,
+        bookingDate: body.bookingDate,
+        createdAt: slot?.startTime ? `${slot.startTime}:00` : '09:00:00',
+        status: 'PENDING',
+        totalPrice: basePrice
+      };
+      records.unshift(record);
+      save('bookingRecords', records);
+
+      return respond({
+        basePrice,
+        discountFromTier: 0,
+        discountFromPromo: 0,
+        discountFromReward: 0,
+        addOn: 'NONE',
+        totalPointEarned: Math.round(basePrice / 1000),
+        finalPrice: basePrice
+      }, 201);
+    }
+
+    const bookingId = Number(parts[0]);
+    const index = records.findIndex(r => Number(r.id) === bookingId);
+    if (index < 0) return fail('Booking not found', 404);
+    const record = records[index];
+
+    if (method === 'PUT' && parts[1] === 'confirm-arrival') {
+      if (record.status !== 'PENDING') return fail("Only 'PENDING' bookings can be CONFIRMED.");
+      records[index].status = 'CONFIRMED';
+      save('bookingRecords', records);
+      return respond(toBackendBookingRecord(records[index]));
+    }
+
+    if (method === 'PUT' && parts[1] === 'complete') {
+      if (record.status !== 'CONFIRMED') return fail("Booking must be 'CONFIRMED' to complete.");
+      records[index].status = 'COMPLETED';
+      save('bookingRecords', records);
+      return respond(toBackendBookingRecord(records[index]));
+    }
+
+    if (method === 'PUT' && parts[1] === 'cancel') {
+      if (record.status === 'COMPLETED') return fail('Cannot cancel a booking that is already COMPLETED.');
+      if (record.status === 'CANCELLED') return fail('This booking has already been cancelled.');
+      records[index].status = 'CANCELLED';
+      save('bookingRecords', records);
+      return respond('Booking has been cancelled successfully');
     }
 
     return null;
@@ -696,6 +879,7 @@
     if (resource === 'admin' && parts[1] === 'time-slots') return handleTimeSlots(method, parts, body);
     if (resource === 'promotions') return handlePromotions(method, parts, body);
     if (resource === 'rewards') return handleRewards(method, parts, body);
+    if (resource === 'v1' && parts[1] === 'bookings') return handleBookingsV1(method, parts.slice(2), searchParams, body);
     if (resource === 'bookings') return handleBookings(method, parts, body);
 
     return handleDemo(method, parts, body) || fail(`Mock API does not support ${method} ${pathname}`, 404);
@@ -759,6 +943,7 @@
     },
     washServices: {
       list: () => request('/api/admin/wash-services'),
+      active: () => request('/api/admin/wash-services/active'),
       create: (payload) => request('/api/admin/wash-services', { method: 'POST', body: payload }),
       update: (id, payload) => request(`/api/admin/wash-services/${id}`, { method: 'PUT', body: payload }),
       remove: (id) => request(`/api/admin/wash-services/${id}`, { method: 'DELETE' })
@@ -771,19 +956,28 @@
     },
     promotions: {
       list: () => request('/api/promotions'),
+      active: () => request('/api/promotions/active'),
       create: (payload) => request('/api/promotions', { method: 'POST', body: payload }),
       update: (id, payload) => request(`/api/promotions/${id}`, { method: 'PUT', body: payload }),
       remove: (id) => request(`/api/promotions/${id}`, { method: 'DELETE' })
     },
     rewards: {
       getAll: () => request('/api/rewards/admin/all'),
+      catalog: () => request('/api/rewards/customer/catalog'),
+      history: (customerId) => request(`/api/rewards/customer/history/${customerId}`),
+      unused: (customerId) => request(`/api/rewards/customer/unused/${customerId}`),
+      redeem: (payload) => request('/api/rewards/customer/redeem', { method: 'POST', body: payload }),
       create: (payload) => request('/api/rewards/admin/create', { method: 'POST', body: payload }),
       update: (id, payload) => request(`/api/rewards/admin/update/${id}`, { method: 'PUT', body: payload }),
       delete: (id) => request(`/api/rewards/admin/delete/${id}`, { method: 'DELETE' })
     },
     bookings: {
-      list: () => request('/api/bookings'),
-      create: (payload) => request('/api/bookings', { method: 'POST', body: payload }),
+      list: () => request('/api/v1/bookings'),
+      availableSlots: (date, washServiceId) => request(`/api/v1/bookings/available-slots?date=${date}&washServiceId=${washServiceId}`),
+      create: (payload) => request('/api/v1/bookings', { method: 'POST', body: payload }),
+      confirmArrival: (id) => request(`/api/v1/bookings/${id}/confirm-arrival`, { method: 'PUT' }),
+      complete: (id) => request(`/api/v1/bookings/${id}/complete`, { method: 'PUT' }),
+      cancel: (id) => request(`/api/v1/bookings/${id}/cancel`, { method: 'PUT' }),
       updateStatus: (id, status) => request(`/api/bookings/${id}/status`, { method: 'PATCH', body: { status } })
     },
     staff: {

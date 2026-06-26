@@ -152,13 +152,28 @@ function getCustomerById(id) {
   return MOCK_DATA.customers.find(c => c.id === id);
 }
 
-function getCurrentCustomer() {
+function getLoggedInUser() {
   const stored = localStorage.getItem('autowash_user');
-  if (stored) {
-    try {
-      const user = JSON.parse(stored);
-      return getCustomerById(user.customerId) || getCustomerById(MOCK_DATA.currentCustomerId);
-    } catch (e) { /* ignore */ }
+  if (!stored) return null;
+  try { return JSON.parse(stored); } catch (e) { return null; }
+}
+
+function getCurrentCustomer() {
+  const user = getLoggedInUser();
+  if (user) {
+    const mockCustomer = getCustomerById(user.customerId)
+      || getCustomerById(`cust-${String(user.customerId || '').padStart(3, '0')}`);
+    if (mockCustomer) return mockCustomer;
+    return {
+      id: user.customerId || user.id,
+      customerId: user.customerId || user.id,
+      name: user.name || user.fullName || 'Khách hàng',
+      email: user.email || user.loginKey || '',
+      tier: normalizeTierKey(user.tier || 'member'),
+      points: Number(user.points || 0),
+      totalVisits: Number(user.totalVisits || 0),
+      totalSpending: Number(user.totalSpending || 0)
+    };
   }
   return getCustomerById(MOCK_DATA.currentCustomerId);
 }
@@ -173,7 +188,12 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('vi-VN');
 }
 
+function normalizeBookingStatus(status) {
+  return String(status || 'pending').toLowerCase();
+}
+
 function getStatusBadge(status) {
+  const key = normalizeBookingStatus(status);
   const map = {
     pending: 'badge-pending',
     confirmed: 'badge-confirmed',
@@ -181,7 +201,9 @@ function getStatusBadge(status) {
     completed: 'badge-completed',
     cancelled: 'badge-cancelled',
     active: 'badge-confirmed',
-    inactive: 'badge-cancelled'
+    inactive: 'badge-cancelled',
+    available: 'badge-confirmed',
+    used: 'badge-cancelled'
   };
   const labels = {
     pending: 'Chờ xác nhận',
@@ -190,10 +212,12 @@ function getStatusBadge(status) {
     completed: 'Hoàn thành',
     cancelled: 'Đã hủy',
     active: 'Hoạt động',
-    inactive: 'Ngừng'
+    inactive: 'Ngừng',
+    available: 'Chưa dùng',
+    used: 'Đã dùng'
   };
-  const cls = map[status] || 'badge-pending';
-  const label = labels[status] || status;
+  const cls = map[key] || 'badge-pending';
+  const label = labels[key] || status;
   return `<span class="badge ${cls}">${label}</span>`;
 }
 
@@ -373,4 +397,164 @@ function getServices() {
 
 function getPromotions() {
   return loadFromStorage('promotions', [...MOCK_DATA.promotions]);
+}
+
+function normalizeWashService(service) {
+  return {
+    serviceId: service.serviceId ?? numId(service.id),
+    serviceName: service.serviceName || service.name || '',
+    description: service.description || '',
+    price: Number(service.price || 0),
+    durationMinutes: Number(service.durationMinutes ?? service.duration ?? 30),
+    isActive: service.isActive !== false && service.active !== false
+  };
+}
+
+function normalizePromotion(promo) {
+  return {
+    promoId: promo.promoId ?? numId(promo.id),
+    promoName: promo.promoName || promo.name || '',
+    description: promo.description || '',
+    discountAmount: Number(promo.discountAmount ?? promo.discountValue ?? 0),
+    startDate: promo.startDate,
+    endDate: promo.endDate,
+    minTierId: promo.minTierId ?? getPromotionMinTierId(promo),
+    minTierName: promo.minTierName || getDbTierName(promo.minTierId ?? getPromotionMinTierId(promo)),
+    isActive: promo.isActive !== false && promo.status !== 'inactive'
+  };
+}
+
+function normalizeBooking(booking) {
+  const id = booking.id ?? booking.bookingId ?? numId(booking.id);
+  const time = booking.createdAt || booking.time || booking.bookingTime || '';
+  const timeText = typeof time === 'string' && time.includes(':') ? time.slice(0, 5) : String(time || '-');
+  return {
+    id,
+    bookingId: id,
+    customerName: booking.fullName || booking.customerName || '',
+    vehiclePlate: booking.licensePlate || booking.vehiclePlate || '',
+    serviceName: booking.serviceName || '',
+    date: booking.bookingDate || booking.date || '',
+    time: timeText,
+    status: normalizeBookingStatus(booking.status),
+    totalPrice: Number(booking.totalPrice ?? 0),
+    pointsEarned: booking.pointsEarned ?? booking.totalPointEarned ?? '-'
+  };
+}
+
+function normalizeRedemption(item) {
+  return {
+    redemptionId: item.redemptionId ?? numId(item.id),
+    rewardId: item.rewardId,
+    rewardName: item.rewardName || '',
+    pointsUsed: Number(item.pointsUsed ?? 0),
+    discountAmount: Number(item.discountAmount ?? 0),
+    redemptionDate: item.redemptionDate,
+    bookingId: item.bookingId ?? null,
+    status: item.status || (item.bookingId ? 'USED' : 'AVAILABLE')
+  };
+}
+
+function normalizeCustomerProfile(profile) {
+  const tierName = profile.loyaltyTier?.tierName || profile.loyaltyTier || profile.currentTier || 'BRONZE';
+  return {
+    id: profile.customerId ?? getLoggedInCustomerId(),
+    customerId: profile.customerId ?? getLoggedInCustomerId(),
+    name: profile.fullName || profile.name || '',
+    email: profile.email || '',
+    phone: profile.phoneNumber || profile.phone || '',
+    tier: normalizeTierKey(tierName),
+    points: Number(profile.currentPoints ?? profile.pointsBalance ?? 0),
+    totalVisits: Number(profile.totalVisits ?? 0),
+    totalSpending: Number(profile.totalSpend ?? profile.totalSpending ?? 0)
+  };
+}
+
+async function fetchCustomerProfile(customerId) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const id = customerId ?? getLoggedInCustomerId();
+  const profile = await window.AutoWashAPI.customers.profile(id);
+  return normalizeCustomerProfile(profile);
+}
+
+async function fetchActiveWashServices() {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const list = await window.AutoWashAPI.washServices.active();
+  return (Array.isArray(list) ? list : []).map(normalizeWashService);
+}
+
+async function fetchActivePromotions() {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const list = await window.AutoWashAPI.promotions.active();
+  return (Array.isArray(list) ? list : []).map(normalizePromotion);
+}
+
+async function fetchAvailableSlots(date, washServiceId) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const list = await window.AutoWashAPI.bookings.availableSlots(date, washServiceId);
+  return Array.isArray(list) ? list : [];
+}
+
+async function fetchBookings() {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const list = await window.AutoWashAPI.bookings.list();
+  return (Array.isArray(list) ? list : []).map(normalizeBooking);
+}
+
+async function fetchCustomerBookings(customerId) {
+  const user = getLoggedInUser();
+  const profile = user?.name ? { name: user.name } : await fetchCustomerProfile(customerId).catch(() => null);
+  const customerName = profile?.name || profile?.fullName || user?.name || user?.fullName || '';
+  const bookings = await fetchBookings();
+  if (!customerName) return bookings;
+  return bookings.filter(b => b.customerName === customerName);
+}
+
+async function createBookingRequest(payload) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  return window.AutoWashAPI.bookings.create(payload);
+}
+
+async function confirmBookingArrival(bookingId) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  return window.AutoWashAPI.bookings.confirmArrival(bookingId);
+}
+
+async function completeBooking(bookingId) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  return window.AutoWashAPI.bookings.complete(bookingId);
+}
+
+async function cancelBookingRequest(bookingId) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  return window.AutoWashAPI.bookings.cancel(bookingId);
+}
+
+async function fetchCustomerRewardCatalog() {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const list = await window.AutoWashAPI.rewards.catalog();
+  return (Array.isArray(list) ? list : []).map(normalizeReward);
+}
+
+async function fetchUnusedVouchers(customerId) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const id = customerId ?? getLoggedInCustomerId();
+  const list = await window.AutoWashAPI.rewards.unused(id);
+  return (Array.isArray(list) ? list : []).map(normalizeRedemption);
+}
+
+async function fetchRedemptionHistory(customerId) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const id = customerId ?? getLoggedInCustomerId();
+  const list = await window.AutoWashAPI.rewards.history(id);
+  return (Array.isArray(list) ? list : []).map(normalizeRedemption);
+}
+
+async function redeemCustomerReward(customerId, rewardId, quantity = 1) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  return window.AutoWashAPI.rewards.redeem({
+    customerId: Number(customerId),
+    rewardId: Number(rewardId),
+    quantity: Number(quantity)
+  });
 }

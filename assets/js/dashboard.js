@@ -211,25 +211,46 @@ function renderBookingHistory() {
   const customer = getCurrentCustomer();
   setUserNav(customer);
   const tbody = document.querySelector('#bookingsTable tbody');
-  getBookings().filter(b => b.customerId === customer.id).forEach(b => {
-    tbody.innerHTML += `<tr data-status="${b.status}" data-date="${b.date}">
-      <td><strong>${b.id}</strong></td>
-      <td>${formatDate(b.date)}</td>
-      <td>${b.time}</td>
-      <td>${b.vehiclePlate}</td>
-      <td>${b.serviceName}</td>
-      <td>${getStatusBadge(b.status)}</td>
-      <td>${formatCurrency(b.totalPrice)}</td>
-      <td>${b.pointsEarned || '-'}</td>
-    </tr>`;
-  });
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="8">Đang tải lịch sử đặt lịch...</td></tr>';
+
+  fetchCustomerBookings(getLoggedInCustomerId())
+    .then(bookings => {
+      if (!bookings.length) {
+        tbody.innerHTML = '<tr><td colspan="8">Chưa có booking nào.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = bookings.map(b => `
+        <tr data-status="${b.status}" data-date="${b.date}">
+          <td><strong>#${b.id}</strong></td>
+          <td>${formatDate(b.date)}</td>
+          <td>${b.time}</td>
+          <td>${b.vehiclePlate}</td>
+          <td>${b.serviceName}</td>
+          <td>${getStatusBadge(b.status)}</td>
+          <td>${formatCurrency(b.totalPrice)}</td>
+          <td>${b.pointsEarned || '-'}</td>
+        </tr>`).join('');
+
+      filterTable('bookingsTable', {
+        status: document.getElementById('filterStatus')?.value,
+        dateFrom: document.getElementById('filterDateFrom')?.value,
+        dateTo: document.getElementById('filterDateTo')?.value
+      });
+    })
+    .catch(error => {
+      tbody.innerHTML = '<tr><td colspan="8">Không tải được lịch sử đặt lịch.</td></tr>';
+      showToast(error.message || 'Không tải được lịch sử đặt lịch.');
+    });
 }
 
 function renderLoyaltyPage() {
   const customer = getCurrentCustomer();
-  const tier = getTierById(customer.tier);
   setUserNav(customer);
 
+  const tier = getTierById(customer.tier);
   document.getElementById('loyaltyTierName').textContent = tier.name;
   document.getElementById('loyaltyPoints').textContent = customer.points.toLocaleString('vi-VN');
   document.querySelector('.current-tier-card')?.classList.add(customer.tier);
@@ -247,24 +268,73 @@ function renderLoyaltyPage() {
   }
 
   const txEl = document.querySelector('#pointsHistory tbody');
-  MOCK_DATA.loyaltyTransactions.filter(t => t.customerId === customer.id).forEach(t => {
-    const sign = t.points > 0 ? '+' : '';
-    txEl.innerHTML += `<tr><td>${formatDate(t.date)}</td><td>${t.description}</td><td><span class="${t.points > 0 ? 'text-primary' : 'text-muted'}">${sign}${t.points}</span></td></tr>`;
-  });
-
   const rewardsEl = document.getElementById('rewardsList');
-  MOCK_DATA.rewards.forEach(r => {
-    rewardsEl.innerHTML += `<div class="reward-item"><h4>${r.name}</h4><p class="text-muted">${r.description}</p><div class="points-cost">${r.pointsCost} điểm</div><button class="btn btn-sm btn-primary" onclick="redeemReward('${r.id}', ${r.pointsCost})">Đổi thưởng</button></div>`;
-  });
+  if (txEl) txEl.innerHTML = '<tr><td colspan="3">Đang tải...</td></tr>';
+  if (rewardsEl) rewardsEl.innerHTML = '<p class="text-muted">Đang tải quà tặng...</p>';
+
+  fetchCustomerProfile(getLoggedInCustomerId())
+    .then(profile => {
+      document.getElementById('loyaltyTierName').textContent = getTierById(profile.tier).name;
+      document.getElementById('loyaltyPoints').textContent = profile.points.toLocaleString('vi-VN');
+    })
+    .catch(() => {});
+
+  fetchRedemptionHistory(getLoggedInCustomerId())
+    .then(items => {
+      if (!txEl) return;
+      if (!items.length) {
+        txEl.innerHTML = '<tr><td colspan="3">Chưa có lịch sử đổi thưởng.</td></tr>';
+        return;
+      }
+      txEl.innerHTML = items.map(item => `
+        <tr>
+          <td>${item.redemptionDate ? new Date(item.redemptionDate).toLocaleDateString('vi-VN') : '-'}</td>
+          <td>${item.rewardName}</td>
+          <td>${getStatusBadge(item.status)} <span class="text-muted">(-${item.pointsUsed})</span></td>
+        </tr>`).join('');
+    })
+    .catch(() => {
+      if (txEl) txEl.innerHTML = '<tr><td colspan="3">Không tải được lịch sử điểm.</td></tr>';
+    });
+
+  fetchCustomerRewardCatalog()
+    .then(rewards => {
+      if (!rewardsEl) return;
+      if (!rewards.length) {
+        rewardsEl.innerHTML = '<p class="text-muted">Chưa có quà tặng khả dụng.</p>';
+        return;
+      }
+      rewardsEl.innerHTML = rewards.map(r => `
+        <div class="reward-item">
+          <h4>${r.rewardName}</h4>
+          <p class="text-muted">${r.description || 'Voucher giảm giá'}</p>
+          <div class="points-cost">${r.pointsRequired.toLocaleString('vi-VN')} điểm</div>
+          <p class="text-muted" style="font-size:0.8125rem">Giảm ${formatCurrency(r.discountAmount)} • Còn ${r.stockQuantity}</p>
+          <button class="btn btn-sm btn-primary" onclick="redeemReward(${r.rewardId}, ${r.pointsRequired})">Đổi thưởng</button>
+        </div>`).join('');
+    })
+    .catch(error => {
+      if (rewardsEl) rewardsEl.innerHTML = '<p class="text-muted">Không tải được danh sách quà tặng.</p>';
+      showToast(error.message || 'Không tải được danh sách quà tặng.');
+    });
 }
 
-function redeemReward(id, cost) {
+async function redeemReward(rewardId, cost) {
+  const customerId = getLoggedInCustomerId();
   const customer = getCurrentCustomer();
-  if (customer.points < cost) {
+  if (Number(customer.points) < Number(cost)) {
     showToast('Không đủ điểm để đổi thưởng.');
     return;
   }
-  showToast('Đổi thưởng thành công! Voucher đã được thêm vào tài khoản.');
+  if (!confirm('Xác nhận đổi thưởng này?')) return;
+
+  try {
+    const result = await redeemCustomerReward(customerId, rewardId, 1);
+    showToast(`Đổi thưởng thành công! Voucher: ${result.rewardName || 'quà tặng'}`);
+    setTimeout(() => location.reload(), 1200);
+  } catch (error) {
+    showToast(error.message || 'Đổi thưởng thất bại.');
+  }
 }
 
 function renderPromotionsPage() {
@@ -353,26 +423,81 @@ function renderAdminCustomers() {
 }
 
 function renderAdminBookings() {
+  if (!requireAuth(['admin', 'staff'])) return;
+
   const tbody = document.querySelector('#adminBookingsTable tbody');
-  getBookings().forEach(b => {
-    tbody.innerHTML += `<tr data-status="${b.status}" data-id="${b.id}">
-      <td>${b.customerName}</td><td>${b.vehiclePlate}</td><td>${b.serviceName}</td>
-      <td>${formatDate(b.date)}</td><td>${b.time}</td><td>${getStatusBadge(b.status)}</td>
-      <td>${formatCurrency(b.totalPrice)}</td>
-      <td class="actions">
-        <button class="btn btn-sm btn-secondary" onclick="updateBookingStatus('${b.id}','confirmed')">Xác nhận</button>
-        <button class="btn btn-sm btn-primary" onclick="updateBookingStatus('${b.id}','in_progress')">Đang rửa</button>
-        <button class="btn btn-sm btn-primary" onclick="updateBookingStatus('${b.id}','completed')">Hoàn thành</button>
-        <button class="btn btn-sm btn-danger" onclick="updateBookingStatus('${b.id}','cancelled')">Hủy</button>
-      </td></tr>`;
-  });
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="8">Đang tải danh sách booking...</td></tr>';
+
+  fetchBookings()
+    .then(bookings => {
+      if (!bookings.length) {
+        tbody.innerHTML = '<tr><td colspan="8">Chưa có booking nào.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = bookings.map(b => {
+        const actions = [];
+        if (b.status === 'pending') {
+          actions.push(`<button class="btn btn-sm btn-secondary" onclick="confirmBookingAction(${b.id})">Xác nhận</button>`);
+          actions.push(`<button class="btn btn-sm btn-danger" onclick="cancelBookingAction(${b.id})">Hủy</button>`);
+        }
+        if (b.status === 'confirmed') {
+          actions.push(`<button class="btn btn-sm btn-primary" onclick="completeBookingAction(${b.id})">Hoàn thành</button>`);
+          actions.push(`<button class="btn btn-sm btn-danger" onclick="cancelBookingAction(${b.id})">Hủy</button>`);
+        }
+        if (!actions.length) actions.push('<span class="text-muted">—</span>');
+
+        return `<tr data-status="${b.status}" data-id="${b.id}">
+          <td>${b.customerName}</td><td>${b.vehiclePlate}</td><td>${b.serviceName}</td>
+          <td>${formatDate(b.date)}</td><td>${b.time}</td><td>${getStatusBadge(b.status)}</td>
+          <td>${formatCurrency(b.totalPrice)}</td>
+          <td class="actions">${actions.join(' ')}</td>
+        </tr>`;
+      }).join('');
+
+      filterTable('adminBookingsTable', {
+        status: document.getElementById('filterStatus')?.value
+      });
+    })
+    .catch(error => {
+      tbody.innerHTML = '<tr><td colspan="8">Không tải được danh sách booking.</td></tr>';
+      showToast(error.message || 'Không tải được danh sách booking.');
+    });
 }
 
-function updateBookingStatus(id, status) {
-  const bookings = getBookings().map(b => b.id === id ? { ...b, status } : b);
-  saveToStorage('bookings', bookings);
-  showToast('Cập nhật trạng thái thành công!');
-  location.reload();
+async function confirmBookingAction(bookingId) {
+  if (!confirm('Xác nhận khách đã đến tiệm?')) return;
+  try {
+    await confirmBookingArrival(bookingId);
+    showToast('Đã xác nhận booking.');
+    renderAdminBookings();
+  } catch (error) {
+    showToast(error.message || 'Xác nhận booking thất bại.');
+  }
+}
+
+async function completeBookingAction(bookingId) {
+  if (!confirm('Hoàn thành booking và tích điểm cho khách?')) return;
+  try {
+    await completeBooking(bookingId);
+    showToast('Booking đã hoàn thành.');
+    renderAdminBookings();
+  } catch (error) {
+    showToast(error.message || 'Hoàn thành booking thất bại.');
+  }
+}
+
+async function cancelBookingAction(bookingId) {
+  if (!confirm('Hủy booking này?')) return;
+  try {
+    await cancelBookingRequest(bookingId);
+    showToast('Đã hủy booking.');
+    renderAdminBookings();
+  } catch (error) {
+    showToast(error.message || 'Hủy booking thất bại.');
+  }
 }
 
 function renderAdminServices() {

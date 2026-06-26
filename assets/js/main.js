@@ -101,6 +101,53 @@ function initAuthForms() {
   document.getElementById('registerForm')?.addEventListener('submit', handleRegister);
   document.getElementById('forgotPasswordForm')?.addEventListener('submit', handleForgotPassword);
   document.getElementById('resetPasswordForm')?.addEventListener('submit', handleResetPassword);
+  initGoogleSignIn();
+}
+
+function initGoogleSignIn() {
+  const wrap = document.getElementById('googleSignInWrap');
+  const onload = document.getElementById('g_id_onload');
+  const clientId = window.AutoWashConfig?.googleClientId;
+
+  if (!wrap || !onload) return;
+
+  if (!clientId) {
+    wrap.style.display = 'none';
+    const divider = wrap.previousElementSibling;
+    if (divider?.classList.contains('auth-divider')) divider.style.display = 'none';
+    return;
+  }
+
+  onload.setAttribute('data-client_id', clientId);
+  onload.setAttribute('data-callback', 'handleGoogleCredentialResponse');
+  onload.setAttribute('data-auto_prompt', 'false');
+  window.handleGoogleCredentialResponse = handleGoogleCredentialResponse;
+}
+
+async function handleGoogleCredentialResponse(response) {
+  const form = document.getElementById('loginForm');
+  if (form) clearFormMessage(form);
+
+  if (!response?.credential) {
+    showToast('Google không trả về token hợp lệ.');
+    return;
+  }
+
+  if (!window.AutoWashAPI) {
+    showToast('API chưa sẵn sàng.');
+    return;
+  }
+
+  try {
+    const auth = await window.AutoWashAPI.auth.loginWithGoogle(response.credential);
+    const remember = document.getElementById('rememberMe')?.checked;
+    const user = persistAuthSession(auth, remember);
+    window.location.href = getAuthRedirect(user.role);
+  } catch (error) {
+    const message = error.message || 'Đăng nhập Google thất bại.';
+    if (form) showFormError(form, message);
+    else showToast(message);
+  }
 }
 
 function showRegisteredNotice() {
@@ -344,4 +391,4 @@ function setupTableFilters(config) {
     if (el) el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', apply);
   });
 }
-
+

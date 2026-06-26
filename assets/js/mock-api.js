@@ -379,10 +379,38 @@
 
     if (method === 'POST' && parts[1] === 'google') {
       if (!body.token) return fail('Google ID Token cannot be blank', 401);
+
+      let email = 'google.user@gmail.com';
+      let name = 'Google User';
+      try {
+        const payload = JSON.parse(atob(body.token.split('.')[1]));
+        email = payload.email || email;
+        name = payload.name || payload.given_name || name;
+      } catch (e) { /* mock fallback */ }
+
+      const customers = load('customers', MOCK_DATA.customers);
+      let customer = customers.find(c => c.email === email);
+      if (!customer) {
+        const id = nextNumber(customers, 'customerId', 'id');
+        customer = {
+          id: legacyId('cust', id),
+          name,
+          phone: '',
+          email,
+          tier: 'member',
+          points: 0,
+          totalVisits: 0,
+          totalSpending: 0,
+          status: 'active'
+        };
+        customers.push(customer);
+        save('customers', customers);
+      }
+
       return respond({
-        id: 1,
-        loginKey: 'google.user@gmail.com',
-        fullName: 'Google User',
+        id: numId(customer.id),
+        loginKey: email,
+        fullName: customer.name || name,
         roleName: 'ROLE_CUSTOMER',
         token: 'mock-google-jwt-token'
       });

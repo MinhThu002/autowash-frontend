@@ -158,11 +158,24 @@ function getLoggedInUser() {
   try { return JSON.parse(stored); } catch (e) { return null; }
 }
 
+function findMockCustomerForUser(user) {
+  if (!user) return null;
+  const email = String(user.email || user.loginKey || '').toLowerCase();
+  if (email) {
+    const byEmail = MOCK_DATA.customers.find(c => String(c.email || '').toLowerCase() === email);
+    if (byEmail) return byEmail;
+  }
+  if (window.AutoWashConfig?.useMock || !user.token) {
+    return getCustomerById(user.customerId)
+      || getCustomerById(`cust-${String(user.customerId || '').padStart(3, '0')}`);
+  }
+  return null;
+}
+
 function getCurrentCustomer() {
   const user = getLoggedInUser();
   if (user) {
-    const mockCustomer = getCustomerById(user.customerId)
-      || getCustomerById(`cust-${String(user.customerId || '').padStart(3, '0')}`);
+    const mockCustomer = findMockCustomerForUser(user);
     if (mockCustomer) return mockCustomer;
     return {
       id: user.customerId || user.id,

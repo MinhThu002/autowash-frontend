@@ -21,7 +21,12 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const fn = renderers[page];
-  if (fn) fn();
+  if (fn) {
+    Promise.resolve(fn()).catch(err => {
+      console.error(err);
+      showToast(err.message || 'Không tải được trang.');
+    });
+  }
 
   setupTableFiltersForPage(page);
   initCrudModals(page);
@@ -36,18 +41,35 @@ function setupTableFiltersForPage(page) {
   if (configs[page]) setupTableFilters(configs[page]);
 }
 
-function renderCustomerDashboard() {
-  const customer = getCurrentCustomer();
-  const tier = getTierById(customer.tier);
-  const nextTierIdx = MOCK_DATA.loyaltyTiers.findIndex(t => t.id === customer.tier) + 1;
+async function renderCustomerDashboard() {
+  const user = requireAuth(['customer']);
+  if (!user) return;
+
+  let customer = getCurrentCustomer();
+
+  if (window.AutoWashAPI && user.customerId) {
+    try {
+      customer = await fetchCustomerProfile(user.customerId);
+      mergeProfileIntoSession(customer);
+    } catch (error) {
+      console.warn('Không tải được profile khách hàng:', error);
+    }
+  }
+
+  paintCustomerDashboard(customer);
+}
+
+function paintCustomerDashboard(customer) {
+  const tier = getTierById(customer.tier || 'member');
+  const nextTierIdx = MOCK_DATA.loyaltyTiers.findIndex(t => t.id === (customer.tier || 'member')) + 1;
   const nextTier = MOCK_DATA.loyaltyTiers[nextTierIdx];
 
   setUserNav(customer);
-  document.getElementById('welcomeName').textContent = customer.name;
+  document.getElementById('welcomeName').textContent = customer.name || 'Khách hàng';
   document.getElementById('currentTier').textContent = tier.name;
-  document.getElementById('pointsBalance').textContent = customer.points.toLocaleString('vi-VN');
-  document.getElementById('totalVisits').textContent = customer.totalVisits;
-  document.getElementById('totalSpending').textContent = formatCurrency(customer.totalSpending);
+  document.getElementById('pointsBalance').textContent = Number(customer.points || 0).toLocaleString('vi-VN');
+  document.getElementById('totalVisits').textContent = Number(customer.totalVisits || 0);
+  document.getElementById('totalSpending').textContent = formatCurrency(Number(customer.totalSpending || 0));
 
   if (nextTier) {
     const visitProgress = Math.min(100, (customer.totalVisits / nextTier.requiredVisits) * 100);
@@ -62,7 +84,7 @@ function renderCustomerDashboard() {
     document.getElementById('tierProgressText').textContent = 'Bạn đã ở hạng cao nhất!';
   }
 
-  const bookings = getBookings().filter(b => b.customerId === customer.id);
+  const bookings = getBookings().filter(b => String(b.customerId) === String(customer.id) || String(b.customerId) === String(customer.customerId));
   const upcoming = bookings.find(b => ['pending', 'confirmed'].includes(b.status) && b.date >= new Date().toISOString().split('T')[0]);
   const upcomingEl = document.getElementById('upcomingBooking');
   if (upcoming) {
@@ -629,10 +651,10 @@ function updateScheduleStatus(id, status) {
 function setUserNav(customer) {
   const user = requireAuth(['customer']);
   if (!user) return;
-  const name = customer?.name || user.name;
+  const name = customer?.name || user.name || 'Khách hàng';
   document.querySelectorAll('.user-name').forEach(el => el.textContent = name);
   document.querySelectorAll('.user-tier').forEach(el => {
-    if (customer) el.textContent = getTierById(customer.tier).name;
+    if (customer) el.textContent = getTierById(customer.tier || 'member').name;
   });
   document.querySelectorAll('.user-avatar').forEach(el => el.textContent = getUserInitials(name));
 }

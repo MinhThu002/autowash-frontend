@@ -63,15 +63,14 @@ function mapBackendRole(roleName) {
 }
 
 function persistAuthSession(auth, remember) {
-  const role = mapBackendRole(auth.roleName);
+  const role = mapBackendRole(auth.roleName || auth.role);
   const user = {
-    email: auth.loginKey,
+    email: auth.loginKey || auth.email,
     role,
     id: auth.id,
     customerId: role === 'customer' ? auth.id : null,
-    name: auth.fullName,
-    token: auth.token || null,
-    backendAuth: auth
+    name: auth.fullName || auth.name || '',
+    token: auth.token || null
   };
 
   localStorage.setItem('autowash_user', JSON.stringify(user));
@@ -85,6 +84,32 @@ function persistAuthSession(auth, remember) {
   else localStorage.removeItem('autowash_remember');
 
   return user;
+}
+
+function mergeProfileIntoSession(profile) {
+  const stored = getLoggedInUser();
+  if (!stored || !profile) return stored;
+  const user = {
+    ...stored,
+    name: profile.name || stored.name,
+    email: profile.email || stored.email,
+    tier: profile.tier || stored.tier,
+    points: profile.points ?? stored.points ?? 0,
+    totalVisits: profile.totalVisits ?? stored.totalVisits ?? 0,
+    totalSpending: profile.totalSpending ?? stored.totalSpending ?? 0
+  };
+  localStorage.setItem('autowash_user', JSON.stringify(user));
+  return user;
+}
+
+async function enrichCustomerSession(customerId) {
+  if (!customerId || !window.AutoWashAPI || typeof fetchCustomerProfile !== 'function') return;
+  try {
+    const profile = await fetchCustomerProfile(customerId);
+    mergeProfileIntoSession(profile);
+  } catch (_) {
+    /* profile is optional at login */
+  }
 }
 
 function getAuthRedirect(role) {
@@ -142,6 +167,10 @@ async function handleGoogleCredentialResponse(response) {
     const auth = await window.AutoWashAPI.auth.loginWithGoogle(response.credential);
     const remember = document.getElementById('rememberMe')?.checked;
     const user = persistAuthSession(auth, remember);
+    if (user.role === 'customer') {
+      await enrichCustomerSession(user.customerId);
+    }
+    showToast('Đăng nhập Google thành công!');
     window.location.href = getAuthRedirect(user.role);
   } catch (error) {
     const message = error.message || 'Đăng nhập Google thất bại.';
@@ -176,6 +205,9 @@ async function handleLogin(e) {
     try {
       const auth = await window.AutoWashAPI.auth.login(loginKey, password);
       user = persistAuthSession(auth, remember);
+      if (user.role === 'customer') {
+        await enrichCustomerSession(user.customerId);
+      }
     } catch (error) {
       showFormError(e.target, error.message || 'Đăng nhập thất bại.');
       return;
@@ -339,6 +371,7 @@ function requireAuth(roles) {
   }
   try {
     const user = JSON.parse(stored);
+    user.role = mapBackendRole(user.role);
     if (roles && !roles.includes(user.role)) {
       window.location.href = 'login.html';
       return null;

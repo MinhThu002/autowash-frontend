@@ -6,7 +6,9 @@ const CSS = `  <link rel="stylesheet" href="assets/css/style.css">
   <link rel="stylesheet" href="assets/css/dashboard.css">
   <link rel="stylesheet" href="assets/css/responsive.css">`;
 
-const SCRIPTS = `  <script src="assets/js/mock-data.js"></script>
+const SCRIPTS = `  <script src="assets/js/api-config.js"></script>
+  <script src="assets/js/mock-api.js"></script>
+  <script src="assets/js/mock-data.js"></script>
   <script src="assets/js/main.js"></script>
   <script src="assets/js/modal.js"></script>`;
 const DASH = `  <script src="assets/js/dashboard.js"></script>`;
@@ -129,7 +131,9 @@ pages['customer-dashboard.html'] = layout('Dashboard', customerSidebar('customer
   <div class="card"><div class="card-header"><h3>Khuyến mãi gợi ý</h3></div><div id="recommendedPromos" style="display:flex;flex-direction:column;gap:0.75rem"></div></div>
 </motion>
 <div class="card"><div class="card-header"><h3>Lịch sử rửa gần đây</h3><a href="booking-history.html">Xem tất cả</a></div><div id="recentHistory"></div></div>
-`, DASH, 'customer-dashboard');
+`, `  <script src="assets/js/loyaltytier.js"></script>
+  <script src="assets/js/promotion.js"></script>
+  <script src="assets/js/dashboard.js"></script>`, 'customer-dashboard');
 
 pages['customer-vehicles.html'] = layout('Xe của tôi', customerSidebar('customer-vehicles.html'), `
 <div class="page-header"><h2>Quản lý xe</h2><button class="btn btn-primary" onclick="openAddVehicle()">+ Thêm xe</button></div>
@@ -206,11 +210,13 @@ const more = {
   <div class="card table-wrapper"><h3>Lịch sử điểm</h3><table class="table" id="pointsHistory"><thead><tr><th>Ngày</th><th>Mô tả</th><th>Điểm</th></tr></thead><tbody></tbody></table></div>
   <div class="card"><h3>Đổi thưởng</h3><div class="rewards-grid" id="rewardsList"></div></div>
 </motion>
-`, DASH, 'loyalty'),
+`, `  <script src="assets/js/loyaltytier.js"></script>
+  <script src="assets/js/dashboard.js"></script>`, 'loyalty'),
 
   'promotions.html': layout('Khuyến mãi', customerSidebar('promotions.html'), `
 <div class="grid grid-3" id="promotionsGrid"></div>
-`, DASH, 'promotions'),
+`, `  <script src="assets/js/promotion.js"></script>
+  <script src="assets/js/dashboard.js"></script>`, 'promotions'),
 
   'admin-dashboard.html': layout('Admin Dashboard', adminSidebar('admin-dashboard.html'), `
 <div class="stats-grid">
@@ -267,11 +273,15 @@ const more = {
 <div class="form-group"><label>Giá trị</label><input type="number" id="promoDiscountValue" required></div></div>
 <div class="form-row"><div class="form-group"><label>Từ ngày</label><input type="date" id="promoStart" required></div>
 <div class="form-group"><label>Đến ngày</label><input type="date" id="promoEnd" required></div></div>
-<div class="form-row"><motion class="form-group"><label>Hạng</label><select id="promoTier"><option value="all">Tất cả</option><option value="silver">Silver+</option><option value="gold">Gold+</option><option value="platinum">Platinum</option></select></div>
+<div class="form-row"><motion class="form-group"><label>Hạng</label><select id="promoTier"><option value="silver">Silver+</option><option value="gold">Gold+</option><option value="platinum">Platinum</option></select></div>
 <div class="form-group"><label>Giới hạn</label><input type="number" id="promoLimit" required></div></div>
 <div class="form-group"><label>Trạng thái</label><select id="promoStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-modal-close="promotionModal">Hủy</button><button type="submit" class="btn btn-primary">Lưu</button></motion></form></div></div>
-`, DASH, 'admin-promotions'),
+`, `  <script src="assets/js/api-config.js"></script>
+  <script src="assets/js/mock-api.js"></script>
+  <script src="assets/js/loyaltytier.js"></script>
+  <script src="assets/js/promotion.js"></script>
+  <script src="assets/js/dashboard.js"></script>`, 'admin-promotions'),
 
   'admin-analytics.html': layout('Analytics', adminSidebar('admin-analytics.html'), `
 <div class="analytics-grid">

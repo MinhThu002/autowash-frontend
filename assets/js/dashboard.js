@@ -345,7 +345,7 @@ function renderAdminPromotions() {
 
   const select = document.getElementById('promoTier');
   if (select) {
-    select.innerHTML = '<option value="all">Tất cả</option>';
+    select.innerHTML = '';
     MOCK_DATA.loyaltyTiers.forEach(t => {
       const activeStatus = t.isActive ?? t.active ?? true;
       if (activeStatus) {

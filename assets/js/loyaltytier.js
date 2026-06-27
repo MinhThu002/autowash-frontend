@@ -183,6 +183,7 @@ async function saveLoyaltyTier(e) {
   };
 
   const isExisting = id ? true : false;
+  let savedId = id;
 
   try {
     const url = isExisting ? `/api/loyalty-tiers/${id}` : '/api/loyalty-tiers';
@@ -206,6 +207,13 @@ async function saveLoyaltyTier(e) {
       } catch (e) {}
       throw new Error(errorMsg);
     }
+
+    if (!isExisting) {
+      const responseData = await res.json();
+      if (responseData && (responseData.tierId || responseData.id)) {
+        savedId = String(responseData.tierId || responseData.id);
+      }
+    }
   } catch (err) {
     if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
       console.warn('Backend API offline, using localStorage fallback', err);
@@ -219,8 +227,8 @@ async function saveLoyaltyTier(e) {
   if (isExisting) {
     MOCK_DATA.loyaltyTiers = MOCK_DATA.loyaltyTiers.map(t => String(t.id || t.tierId) === String(id) ? { ...t, ...data } : t);
   } else {
-    data.id = String(Date.now());
-    data.tierId = Date.now();
+    data.id = savedId || String(Date.now());
+    data.tierId = Number(savedId) || Date.now();
     MOCK_DATA.loyaltyTiers.push(data);
   }
   localStorage.setItem('autowash_loyaltyTiers', JSON.stringify(MOCK_DATA.loyaltyTiers));

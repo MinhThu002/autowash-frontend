@@ -375,16 +375,42 @@ function updateBookingStatus(id, status) {
   location.reload();
 }
 
-function renderAdminServices() {
+let adminServicesCache = [];
+
+async function renderAdminServices() {
   const tbody = document.querySelector('#servicesTable tbody');
-  getServices().forEach(s => {
-    tbody.innerHTML += `<tr data-id="${s.id}">
-      <td><strong>${s.name}</strong></td><td>${s.vehicleType}</td><td>${s.duration} phút</td>
-      <td>${formatCurrency(s.price)}</td><td>${s.description}</td>
-      <td>${getStatusBadge(s.active ? 'active' : 'inactive')}</td>
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6" class="text-center">Đang tải...</td></tr>';
+  
+  try {
+    if (window.AutoWashAPI && window.AutoWashAPI.washServices) {
+      adminServicesCache = await window.AutoWashAPI.washServices.list();
+    } else {
+      adminServicesCache = getServices();
+    }
+  } catch (err) {
+    console.warn('Fallback to local storage', err);
+    adminServicesCache = getServices();
+  }
+  
+  tbody.innerHTML = '';
+  if (!adminServicesCache || adminServicesCache.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Chưa có dịch vụ nào</td></tr>';
+    return;
+  }
+  
+  adminServicesCache.forEach(s => {
+    const id = s.id || s.serviceId || s.id;
+    const active = s.active !== undefined ? s.active : (s.isActive !== undefined ? s.isActive : true);
+    const name = s.name || s.serviceName || '';
+    const duration = s.duration || s.durationMinutes || 0;
+    tbody.innerHTML += `<tr data-id="${id}">
+      <td><strong>${name}</strong></td><td>${duration} phút</td>
+      <td>${formatCurrency(s.price || 0)}</td><td>${s.description || ''}</td>
+      <td>${getStatusBadge(active ? 'active' : 'inactive')}</td>
       <td class="actions">
-        <button class="btn btn-sm btn-secondary" onclick="editService('${s.id}')">Sửa</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteService('${s.id}')">Xóa</button>
+        <button class="btn btn-sm btn-secondary" onclick="editService('${id}')">Sửa</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteService('${id}')">Xóa</button>
       </td></tr>`;
   });
 }
@@ -572,43 +598,102 @@ function initCrudModals(page) {
   document.getElementById('rewardForm')?.addEventListener('submit', saveReward);
 }
 
-function saveService(e) {
+async function saveService(e) {
   e.preventDefault();
   const id = document.getElementById('serviceId').value;
+  const nameVal = document.getElementById('serviceName').value;
+  const durationVal = parseInt(document.getElementById('serviceDuration').value) || 0;
+  const priceVal = parseInt(document.getElementById('servicePrice').value) || 0;
+  const descVal = document.getElementById('serviceDescription').value;
+  const activeVal = document.getElementById('serviceActive').value === 'true';
+
   const data = {
-    id: id || 'svc-' + Date.now(),
-    name: document.getElementById('serviceName').value,
-    vehicleType: document.getElementById('serviceVehicleType').value,
-    duration: parseInt(document.getElementById('serviceDuration').value),
-    price: parseInt(document.getElementById('servicePrice').value),
-    description: document.getElementById('serviceDescription').value,
-    active: document.getElementById('serviceActive').value === 'true'
+    serviceName: nameVal,
+    durationMinutes: durationVal,
+    price: priceVal,
+    description: descVal,
+    isActive: activeVal,
+    // fallback for local storage / mock
+    name: nameVal,
+    duration: durationVal,
+    active: activeVal
   };
+
+  // Frontend Name Conflict Check
+  const nameConflict = adminServicesCache.find(s => 
+    (s.name === nameVal || s.serviceName === nameVal) && String(s.id || s.serviceId) !== String(id)
+  );
+  if (nameConflict) {
+    alert("Tên dịch vụ '" + nameVal + "' đã tồn tại. Vui lòng chọn tên khác!");
+    return;
+  }
+
+  try {
+    if (window.AutoWashAPI && window.AutoWashAPI.washServices) {
+      if (id) {
+        await window.AutoWashAPI.washServices.update(id, data);
+      } else {
+        await window.AutoWashAPI.washServices.create(data);
+      }
+      showToast('Lưu dịch vụ thành công!');
+      closeModal('serviceModal');
+      await renderAdminServices();
+      return;
+    }
+  } catch (err) {
+    console.warn('Backend API error, using fallback', err);
+    let errorMsg = err.message || 'Lỗi không xác định';
+    if (errorMsg.includes('Failed to fetch')) {
+        // fallback
+    } else {
+        alert('Không thể lưu lên server:\\n' + errorMsg);
+        return;
+    }
+  }
+
+  // Fallback local storage
+  const svcId = id || 'svc-' + Date.now();
+  data.id = svcId;
   let services = getServices();
   services = id ? services.map(s => s.id === id ? { ...s, ...data } : s) : [...services, data];
   saveToStorage('services', services);
   closeModal('serviceModal');
   showToast('Lưu dịch vụ thành công!');
-  location.reload();
+  renderAdminServices();
 }
 
 function editService(id) {
-  const s = getServices().find(x => x.id === id);
+  const s = adminServicesCache.find(x => String(x.id || x.serviceId) === String(id));
   if (!s) return;
-  document.getElementById('serviceId').value = s.id;
-  document.getElementById('serviceName').value = s.name;
-  document.getElementById('serviceVehicleType').value = s.vehicleType;
-  document.getElementById('serviceDuration').value = s.duration;
-  document.getElementById('servicePrice').value = s.price;
-  document.getElementById('serviceDescription').value = s.description;
-  document.getElementById('serviceActive').value = s.active ? 'true' : 'false';
+  document.getElementById('serviceId').value = s.id || s.serviceId;
+  document.getElementById('serviceName').value = s.name || s.serviceName || '';
+  document.getElementById('serviceDuration').value = s.duration || s.durationMinutes || 0;
+  document.getElementById('servicePrice').value = s.price || 0;
+  document.getElementById('serviceDescription').value = s.description || '';
+  const activeStatus = s.active !== undefined ? s.active : (s.isActive !== undefined ? s.isActive : true);
+  document.getElementById('serviceActive').value = activeStatus ? 'true' : 'false';
   openModal('serviceModal');
 }
 
-function deleteService(id) {
+async function deleteService(id) {
   if (!confirm('Xóa dịch vụ này?')) return;
-  saveToStorage('services', getServices().filter(s => s.id !== id));
-  location.reload();
+  
+  try {
+    if (window.AutoWashAPI && window.AutoWashAPI.washServices) {
+      await window.AutoWashAPI.washServices.remove(id);
+      showToast('Xóa dịch vụ thành công!');
+      await renderAdminServices();
+      return;
+    }
+  } catch (err) {
+    console.warn('Delete failed', err);
+    alert('Không thể xóa: ' + (err.message || ''));
+    return;
+  }
+  
+  saveToStorage('services', getServices().filter(s => String(s.id) !== String(id)));
+  showToast('Đã xóa dịch vụ!');
+  renderAdminServices();
 }
 
 function openAddService() {

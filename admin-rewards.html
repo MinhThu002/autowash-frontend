@@ -26,53 +26,32 @@
       </div>
     </header>
     <div class="page-content">
-      <div class="page-header"><h2>Reward Catalog</h2><button class="btn btn-primary" onclick="openAddReward()">+ Thêm quà</button></div>
-      <div class="card table-wrapper">
-        <table class="table" id="rewardsTable">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Tên quà</th>
-              <th>Mô tả</th>
-              <th>Điểm đổi</th>
-              <th>Giảm giá</th>
-              <th>Tồn kho</th>
-              <th>Trạng thái</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <div class="modal-overlay" id="rewardModal">
-        <div class="modal">
-          <div class="modal-header"><h3 id="rewardModalTitle">Thêm quà tặng</h3><button class="modal-close" data-modal-close="rewardModal">&times;</button></div>
-          <form id="rewardForm">
-            <div class="modal-body">
-              <input type="hidden" id="rewardId">
-              <div class="form-group"><label for="rewardName">Tên quà</label><input type="text" id="rewardName" required></div>
-              <div class="form-group"><label for="rewardDescription">Mô tả</label><textarea id="rewardDescription"></textarea></div>
-              <div class="form-row">
-                <div class="form-group"><label for="rewardPoints">Điểm cần đổi</label><input type="number" id="rewardPoints" min="1" required></div>
-                <div class="form-group"><label for="rewardDiscount">Giá trị giảm (đ)</label><input type="number" id="rewardDiscount" min="0" step="1000" required></div>
-              </div>
-              <div class="form-row">
-                <div class="form-group"><label for="rewardStock">Tồn kho</label><input type="number" id="rewardStock" min="0" required></div>
-                <div class="form-group"><label for="rewardActive">Trạng thái</label><select id="rewardActive"><option value="true">Active</option><option value="false">Inactive</option></select></div>
-              </div>
-            </div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-modal-close="rewardModal">Hủy</button><button type="submit" class="btn btn-primary">Lưu</button></div>
-          </form>
-        </div>
-      </div>
-    </div>
+<div class="page-header"><h2>Quản lý quà tặng</h2><button class="btn btn-primary" onclick="openAddReward()">+ Thêm quà tặng</button></div>
+<div class="card table-wrapper"><table class="table" id="rewardsTable"><thead><tr><th>ID</th><th>Tên quà</th><th>Mô tả</th><th>Điểm đổi</th><th>Trị giá giảm</th><th>Số lượng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody></tbody></table></div>
+<div class="modal-overlay" id="rewardModal"><div class="modal"><div class="modal-header"><h3 id="rewardModalTitle">Thêm quà tặng</h3><button class="modal-close" data-modal-close="rewardModal">&times;</button></div>
+<form id="rewardForm"><div class="modal-body">
+<input type="hidden" id="rewardId">
+<div class="form-group"><label>Tên quà tặng</label><input id="rewardName" required placeholder="Ví dụ: Voucher giảm 50k"></div>
+<div class="form-group"><label>Mô tả</label><textarea id="rewardDescription" placeholder="Mô tả quà tặng..."></textarea></div>
+<div class="form-row">
+  <div class="form-group"><label>Điểm yêu cầu</label><input type="number" id="rewardPoints" required min="1"></div>
+  <div class="form-group"><label>Trị giá giảm (đ)</label><input type="number" id="rewardDiscount" required min="0"></div>
+</div>
+<div class="form-row">
+  <div class="form-group"><label>Số lượng kho</label><input type="number" id="rewardStock" required min="0"></div>
+  <div class="form-group"><label>Trạng thái</label><select id="rewardActive"><option value="true">Kích hoạt</option><option value="false">Ngừng kích hoạt</option></select></div>
+</div>
+</div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-modal-close="rewardModal">Hủy</button><button type="submit" class="btn btn-primary">Lưu</button></div></form></div></div>
+</div>
   </main>
 </div>
-  <script src="assets/js/mock-data.js"></script>
   <script src="assets/js/api-config.js"></script>
   <script src="assets/js/mock-api.js"></script>
+  <script src="assets/js/mock-data.js"></script>
   <script src="assets/js/main.js"></script>
   <script src="assets/js/modal.js"></script>
+  <script src="assets/js/api-config.js"></script>
+  <script src="assets/js/mock-api.js"></script>
   <script src="assets/js/dashboard.js"></script>
 </body>
 </html>

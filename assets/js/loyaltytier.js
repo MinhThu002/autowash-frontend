@@ -183,8 +183,8 @@ async function saveLoyaltyTier(e) {
   };
 
   const isExisting = id ? true : false;
-  let savedId = id;
 
+  let savedResponse = null;
   try {
     const url = isExisting ? `/api/loyalty-tiers/${id}` : '/api/loyalty-tiers';
     const method = isExisting ? 'PUT' : 'POST';
@@ -208,12 +208,9 @@ async function saveLoyaltyTier(e) {
       throw new Error(errorMsg);
     }
 
-    if (!isExisting) {
-      const responseData = await res.json();
-      if (responseData && (responseData.tierId || responseData.id)) {
-        savedId = String(responseData.tierId || responseData.id);
-      }
-    }
+    try {
+      savedResponse = await res.json();
+    } catch (e) {}
   } catch (err) {
     if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
       console.warn('Backend API offline, using localStorage fallback', err);
@@ -224,12 +221,21 @@ async function saveLoyaltyTier(e) {
   }
 
   // Update MOCK_DATA and localStorage offline fallback
-  if (isExisting) {
-    MOCK_DATA.loyaltyTiers = MOCK_DATA.loyaltyTiers.map(t => String(t.id || t.tierId) === String(id) ? { ...t, ...data } : t);
+  if (savedResponse) {
+    const mapped = mapBackendTierToFrontend(savedResponse);
+    if (isExisting) {
+      MOCK_DATA.loyaltyTiers = MOCK_DATA.loyaltyTiers.map(t => String(t.id || t.tierId) === String(id) ? mapped : t);
+    } else {
+      MOCK_DATA.loyaltyTiers.push(mapped);
+    }
   } else {
-    data.id = savedId || String(Date.now());
-    data.tierId = Number(savedId) || Date.now();
-    MOCK_DATA.loyaltyTiers.push(data);
+    if (isExisting) {
+      MOCK_DATA.loyaltyTiers = MOCK_DATA.loyaltyTiers.map(t => String(t.id || t.tierId) === String(id) ? { ...t, ...data } : t);
+    } else {
+      data.id = String(Date.now());
+      data.tierId = Date.now();
+      MOCK_DATA.loyaltyTiers.push(data);
+    }
   }
   localStorage.setItem('autowash_loyaltyTiers', JSON.stringify(MOCK_DATA.loyaltyTiers));
   

@@ -643,6 +643,12 @@ async function saveService(e) {
   } catch (err) {
     console.warn('Backend API error, using fallback', err);
     let errorMsg = err.message || 'Lỗi không xác định';
+    
+    // Translate the backend's raw English duplicate error into Vietnamese
+    if (errorMsg.includes('already exists')) {
+      errorMsg = "Tên dịch vụ này đã tồn tại trên hệ thống. Vui lòng chọn tên khác!";
+    }
+
     if (errorMsg.includes('Failed to fetch')) {
         // fallback
     } else {

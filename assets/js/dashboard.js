@@ -269,6 +269,9 @@ function renderBookingHistory() {
 }
 
 function renderLoyaltyPage() {
+  const user = requireAuth(['customer']);
+  if (!user) return;
+
   const customer = getCurrentCustomer();
   setUserNav(customer);
 
@@ -352,6 +355,7 @@ async function redeemReward(rewardId, cost) {
 
   try {
     const result = await redeemCustomerReward(customerId, rewardId, 1);
+    mergeProfileIntoSession(await fetchCustomerProfile(customerId).catch(() => null));
     showToast(`Đổi thưởng thành công! Voucher: ${result.rewardName || 'quà tặng'}`);
     setTimeout(() => location.reload(), 1200);
   } catch (error) {

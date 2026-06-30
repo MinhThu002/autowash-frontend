@@ -226,7 +226,8 @@ async function confirmBooking(e) {
 
   try {
     const result = await createBookingRequest(payload);
-    showToast(`Đặt lịch thành công! Tổng thanh toán: ${formatCurrency(result.finalPrice || 0)}`);
+    const paid = Number(result.finalPrice ?? result.totalPrice ?? 0);
+    showToast(`Đặt lịch thành công! Tổng thanh toán: ${formatCurrency(paid)}`);
     setTimeout(() => { window.location.href = 'booking-history.html'; }, 1500);
   } catch (error) {
     showToast(error.message || 'Đặt lịch thất bại.');

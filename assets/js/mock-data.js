@@ -439,7 +439,7 @@ function normalizePromotion(promo) {
 
 function normalizeBooking(booking) {
   const id = booking.id ?? booking.bookingId ?? numId(booking.id);
-  const time = booking.createdAt || booking.time || booking.bookingTime || '';
+  const time = booking.startTime || booking.createdAt || booking.time || booking.bookingTime || '';
   const timeText = typeof time === 'string' && time.includes(':') ? time.slice(0, 5) : String(time || '-');
   return {
     id,

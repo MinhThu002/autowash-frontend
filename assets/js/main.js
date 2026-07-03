@@ -1,5 +1,6 @@
 /* AutoWash Pro - Main */
 document.addEventListener('DOMContentLoaded', () => {
+  syncAuthToken();
   initStorage();
   initSidebar();
   initLandingMenu();
@@ -56,22 +57,45 @@ function showToast(message, duration = 3000) {
 }
 
 function mapBackendRole(roleName) {
-  const normalized = String(roleName || '').replace(/^ROLE_/, '').toUpperCase();
-  if (normalized === 'MANAGER') return 'admin';
+  const raw = String(roleName || '').trim();
+  const lower = raw.toLowerCase();
+  if (lower === 'admin' || lower === 'staff' || lower === 'customer') return lower;
+
+  const normalized = raw.replace(/^ROLE_/, '').toUpperCase();
+  if (normalized === 'MANAGER' || normalized === 'ADMIN') return 'admin';
   if (normalized === 'STAFF') return 'staff';
+  if (normalized === 'CUSTOMER') return 'customer';
   return 'customer';
 }
 
+function getAuthorizedUser(roles) {
+  const stored = localStorage.getItem('autowash_user');
+  if (!stored) return null;
+  try {
+    const user = JSON.parse(stored);
+    user.role = mapBackendRole(user.role);
+    if (roles?.length && !roles.includes(user.role)) return null;
+    return user;
+  } catch (e) {
+    return null;
+  }
+}
+
+function syncAuthToken() {
+  if (localStorage.getItem('autowash_token')) return;
+  const user = getLoggedInUser();
+  if (user?.token) localStorage.setItem('autowash_token', user.token);
+}
+
 function persistAuthSession(auth, remember) {
-  const role = mapBackendRole(auth.roleName);
+  const role = mapBackendRole(auth.roleName || auth.role);
   const user = {
-    email: auth.loginKey,
+    email: auth.loginKey || auth.email,
     role,
     id: auth.id,
     customerId: role === 'customer' ? auth.id : null,
-    name: auth.fullName,
-    token: auth.token || null,
-    backendAuth: auth
+    name: auth.fullName || auth.name || '',
+    token: auth.token || null
   };
 
   localStorage.setItem('autowash_user', JSON.stringify(user));
@@ -85,6 +109,32 @@ function persistAuthSession(auth, remember) {
   else localStorage.removeItem('autowash_remember');
 
   return user;
+}
+
+function mergeProfileIntoSession(profile) {
+  const stored = getLoggedInUser();
+  if (!stored || !profile) return stored;
+  const user = {
+    ...stored,
+    name: profile.name || stored.name,
+    email: profile.email || stored.email,
+    tier: profile.tier || stored.tier,
+    points: profile.points ?? stored.points ?? 0,
+    totalVisits: profile.totalVisits ?? stored.totalVisits ?? 0,
+    totalSpending: profile.totalSpending ?? stored.totalSpending ?? 0
+  };
+  localStorage.setItem('autowash_user', JSON.stringify(user));
+  return user;
+}
+
+async function enrichCustomerSession(customerId) {
+  if (!customerId || !window.AutoWashAPI || typeof fetchCustomerProfile !== 'function') return;
+  try {
+    const profile = await fetchCustomerProfile(customerId);
+    mergeProfileIntoSession(profile);
+  } catch (_) {
+    /* profile is optional at login */
+  }
 }
 
 function getAuthRedirect(role) {
@@ -101,6 +151,57 @@ function initAuthForms() {
   document.getElementById('registerForm')?.addEventListener('submit', handleRegister);
   document.getElementById('forgotPasswordForm')?.addEventListener('submit', handleForgotPassword);
   document.getElementById('resetPasswordForm')?.addEventListener('submit', handleResetPassword);
+  initGoogleSignIn();
+}
+
+function initGoogleSignIn() {
+  const wrap = document.getElementById('googleSignInWrap');
+  const onload = document.getElementById('g_id_onload');
+  const clientId = window.AutoWashConfig?.googleClientId;
+
+  if (!wrap || !onload) return;
+
+  if (!clientId) {
+    wrap.style.display = 'none';
+    const divider = wrap.previousElementSibling;
+    if (divider?.classList.contains('auth-divider')) divider.style.display = 'none';
+    return;
+  }
+
+  onload.setAttribute('data-client_id', clientId);
+  onload.setAttribute('data-callback', 'handleGoogleCredentialResponse');
+  onload.setAttribute('data-auto_prompt', 'false');
+  window.handleGoogleCredentialResponse = handleGoogleCredentialResponse;
+}
+
+async function handleGoogleCredentialResponse(response) {
+  const form = document.getElementById('loginForm');
+  if (form) clearFormMessage(form);
+
+  if (!response?.credential) {
+    showToast('Google không trả về token hợp lệ.');
+    return;
+  }
+
+  if (!window.AutoWashAPI) {
+    showToast('API chưa sẵn sàng.');
+    return;
+  }
+
+  try {
+    const auth = await window.AutoWashAPI.auth.loginWithGoogle(response.credential);
+    const remember = document.getElementById('rememberMe')?.checked;
+    const user = persistAuthSession(auth, remember);
+    if (user.role === 'customer') {
+      await enrichCustomerSession(user.customerId);
+    }
+    showToast('Đăng nhập Google thành công!');
+    window.location.href = getAuthRedirect(user.role);
+  } catch (error) {
+    const message = error.message || 'Đăng nhập Google thất bại.';
+    if (form) showFormError(form, message);
+    else showToast(message);
+  }
 }
 
 function showRegisteredNotice() {
@@ -129,6 +230,9 @@ async function handleLogin(e) {
     try {
       const auth = await window.AutoWashAPI.auth.login(loginKey, password);
       user = persistAuthSession(auth, remember);
+      if (user.role === 'customer') {
+        await enrichCustomerSession(user.customerId);
+      }
     } catch (error) {
       showFormError(e.target, error.message || 'Đăng nhập thất bại.');
       return;
@@ -284,23 +388,13 @@ function logout() {
   window.location.href = 'login.html';
 }
 
-function requireAuth(roles) {
-  const stored = localStorage.getItem('autowash_user');
-  if (!stored) {
+function requireAuth(roles, options = {}) {
+  const redirect = options.redirect !== false;
+  const user = getAuthorizedUser(roles);
+  if (!user && redirect) {
     window.location.href = 'login.html';
-    return null;
   }
-  try {
-    const user = JSON.parse(stored);
-    if (roles && !roles.includes(user.role)) {
-      window.location.href = 'login.html';
-      return null;
-    }
-    return user;
-  } catch (e) {
-    window.location.href = 'login.html';
-    return null;
-  }
+  return user;
 }
 
 function getUserInitials(name) {
@@ -344,4 +438,4 @@ function setupTableFilters(config) {
     if (el) el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', apply);
   });
 }
-
+

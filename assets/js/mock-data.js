@@ -2,6 +2,13 @@
 const MOCK_DATA = {
   currentCustomerId: 'cust-001',
 
+  dbLoyaltyTiers: [
+    { tierId: 1, tierName: 'BRONZE' },
+    { tierId: 2, tierName: 'SILVER' },
+    { tierId: 3, tierName: 'GOLD' },
+    { tierId: 4, tierName: 'DIAMOND' }
+  ],
+
   loyaltyTiers: [
     { id: 'member', name: 'Member', requiredVisits: 0, requiredSpending: 0, pointRate: 1, bookingWindow: 7, discountPercent: 0, benefits: ['Đặt lịch trước 7 ngày', 'Tích điểm cơ bản'] },
     { id: 'silver', name: 'Silver', requiredVisits: 5, requiredSpending: 500000, pointRate: 1.2, bookingWindow: 10, discountPercent: 5, benefits: ['Giảm 5%', 'Đặt lịch 10 ngày', 'Ưu tiên xếp hàng nhẹ'] },
@@ -43,11 +50,11 @@ const MOCK_DATA = {
   ],
 
   promotions: [
-    { id: 'promo-001', name: 'Chào hè 2026', description: 'Giảm giá mùa hè cho tất cả dịch vụ ô tô', discountType: 'percent', discountValue: 15, startDate: '2026-05-01', endDate: '2026-08-31', targetTier: 'all', usageLimit: 500, usedCount: 128, status: 'active' },
-    { id: 'promo-002', name: 'Gold Member Exclusive', description: 'Giảm thêm cho hạng Gold trở lên', discountType: 'percent', discountValue: 10, startDate: '2026-04-01', endDate: '2026-12-31', targetTier: 'gold', usageLimit: 200, usedCount: 45, status: 'active' },
-    { id: 'promo-003', name: 'Xe máy cuối tuần', description: 'Giảm 20k cho rửa xe máy T7-CN', discountType: 'fixed', discountValue: 20000, startDate: '2026-05-01', endDate: '2026-06-30', targetTier: 'all', usageLimit: 1000, usedCount: 312, status: 'active' },
-    { id: 'promo-004', name: 'Platinum VIP', description: 'Miễn phí wax nhẹ', discountType: 'fixed', discountValue: 50000, startDate: '2026-01-01', endDate: '2026-12-31', targetTier: 'platinum', usageLimit: 50, usedCount: 12, status: 'active' },
-    { id: 'promo-005', name: 'Tết 2025', description: 'Khuyến mãi đã kết thúc', discountType: 'percent', discountValue: 20, startDate: '2025-01-01', endDate: '2025-02-15', targetTier: 'all', usageLimit: 300, usedCount: 300, status: 'inactive' }
+    { id: 'promo-001', name: 'Chào hè 2026', description: 'Giảm giá mùa hè cho tất cả dịch vụ ô tô', discountType: 'percent', discountValue: 15, startDate: '2026-05-01', endDate: '2026-08-31', minTierId: null, usageLimit: 500, usedCount: 128, status: 'active' },
+    { id: 'promo-002', name: 'Gold Member Exclusive', description: 'Giảm thêm cho hạng Gold', discountType: 'percent', discountValue: 10, startDate: '2026-04-01', endDate: '2026-12-31', minTierId: 3, usageLimit: 200, usedCount: 45, status: 'active' },
+    { id: 'promo-003', name: 'Xe máy cuối tuần', description: 'Giảm 20k cho rửa xe máy T7-CN', discountType: 'fixed', discountValue: 20000, startDate: '2026-05-01', endDate: '2026-06-30', minTierId: null, usageLimit: 1000, usedCount: 312, status: 'active' },
+    { id: 'promo-004', name: 'Diamond VIP', description: 'Miễn phí wax nhẹ', discountType: 'fixed', discountValue: 50000, startDate: '2026-01-01', endDate: '2026-12-31', minTierId: 4, usageLimit: 50, usedCount: 12, status: 'active' },
+    { id: 'promo-005', name: 'Tết 2025', description: 'Khuyến mãi đã kết thúc', discountType: 'percent', discountValue: 20, startDate: '2025-01-01', endDate: '2025-02-15', minTierId: null, usageLimit: 300, usedCount: 300, status: 'inactive' }
   ],
 
   loyaltyTransactions: [
@@ -110,17 +117,76 @@ function getTierById(tierId) {
   return MOCK_DATA.loyaltyTiers.find(t => t.id === tierId) || MOCK_DATA.loyaltyTiers[0];
 }
 
+function getDbTierById(tierId) {
+  return MOCK_DATA.dbLoyaltyTiers.find(t => t.tierId === Number(tierId)) || null;
+}
+
+function getDbTierName(minTierId) {
+  if (minTierId == null || minTierId === '') return 'Tất cả';
+  return getDbTierById(minTierId)?.tierName || 'Tất cả';
+}
+
+function tierKeyToId(tierKey) {
+  const map = { member: 1, bronze: 1, silver: 2, gold: 3, platinum: 4, diamond: 4 };
+  return map[normalizeTierKey(tierKey)] || 1;
+}
+
+function getPromotionMinTierId(promotion) {
+  if (promotion.minTierId != null && promotion.minTierId !== '') {
+    return Number(promotion.minTierId);
+  }
+  if (!promotion.targetTier || promotion.targetTier === 'all') return null;
+  return tierKeyToId(promotion.targetTier);
+}
+
+function populatePromotionTierSelect(selectEl, selectedValue) {
+  if (!selectEl) return;
+  selectEl.innerHTML = '<option value="">Tất cả</option>' +
+    MOCK_DATA.dbLoyaltyTiers.map(t => `<option value="${t.tierId}">${t.tierName}</option>`).join('');
+  if (selectedValue != null && selectedValue !== '') {
+    selectEl.value = String(selectedValue);
+  }
+}
+
 function getCustomerById(id) {
   return MOCK_DATA.customers.find(c => c.id === id);
 }
 
-function getCurrentCustomer() {
+function getLoggedInUser() {
   const stored = localStorage.getItem('autowash_user');
-  if (stored) {
-    try {
-      const user = JSON.parse(stored);
-      return getCustomerById(user.customerId) || getCustomerById(MOCK_DATA.currentCustomerId);
-    } catch (e) { /* ignore */ }
+  if (!stored) return null;
+  try { return JSON.parse(stored); } catch (e) { return null; }
+}
+
+function findMockCustomerForUser(user) {
+  if (!user) return null;
+  const email = String(user.email || user.loginKey || '').toLowerCase();
+  if (email) {
+    const byEmail = MOCK_DATA.customers.find(c => String(c.email || '').toLowerCase() === email);
+    if (byEmail) return byEmail;
+  }
+  if (window.AutoWashConfig?.useMock || !user.token) {
+    return getCustomerById(user.customerId)
+      || getCustomerById(`cust-${String(user.customerId || '').padStart(3, '0')}`);
+  }
+  return null;
+}
+
+function getCurrentCustomer() {
+  const user = getLoggedInUser();
+  if (user) {
+    const mockCustomer = findMockCustomerForUser(user);
+    if (mockCustomer) return mockCustomer;
+    return {
+      id: user.customerId || user.id,
+      customerId: user.customerId || user.id,
+      name: user.name || user.fullName || 'Khách hàng',
+      email: user.email || user.loginKey || '',
+      tier: normalizeTierKey(user.tier || 'member'),
+      points: Number(user.points || 0),
+      totalVisits: Number(user.totalVisits || 0),
+      totalSpending: Number(user.totalSpending || 0)
+    };
   }
   return getCustomerById(MOCK_DATA.currentCustomerId);
 }
@@ -135,7 +201,12 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('vi-VN');
 }
 
+function normalizeBookingStatus(status) {
+  return String(status || 'pending').toLowerCase();
+}
+
 function getStatusBadge(status) {
+  const key = normalizeBookingStatus(status);
   const map = {
     pending: 'badge-pending',
     confirmed: 'badge-confirmed',
@@ -143,7 +214,9 @@ function getStatusBadge(status) {
     completed: 'badge-completed',
     cancelled: 'badge-cancelled',
     active: 'badge-confirmed',
-    inactive: 'badge-cancelled'
+    inactive: 'badge-cancelled',
+    available: 'badge-confirmed',
+    used: 'badge-cancelled'
   };
   const labels = {
     pending: 'Chờ xác nhận',
@@ -152,10 +225,12 @@ function getStatusBadge(status) {
     completed: 'Hoàn thành',
     cancelled: 'Đã hủy',
     active: 'Hoạt động',
-    inactive: 'Ngừng'
+    inactive: 'Ngừng',
+    available: 'Chưa dùng',
+    used: 'Đã dùng'
   };
-  const cls = map[status] || 'badge-pending';
-  const label = labels[status] || status;
+  const cls = map[key] || 'badge-pending';
+  const label = labels[key] || status;
   return `<span class="badge ${cls}">${label}</span>`;
 }
 
@@ -337,4 +412,164 @@ function getServices() {
 
 function getPromotions() {
   return loadFromStorage('promotions', [...MOCK_DATA.promotions]);
+}
+
+function normalizeWashService(service) {
+  return {
+    serviceId: service.serviceId ?? numId(service.id),
+    serviceName: service.serviceName || service.name || '',
+    description: service.description || '',
+    price: Number(service.price || 0),
+    durationMinutes: Number(service.durationMinutes ?? service.duration ?? 30),
+    isActive: service.isActive !== false && service.active !== false
+  };
+}
+
+function normalizePromotion(promo) {
+  return {
+    promoId: promo.promoId ?? numId(promo.id),
+    promoName: promo.promoName || promo.name || '',
+    description: promo.description || '',
+    discountAmount: Number(promo.discountAmount ?? promo.discountValue ?? 0),
+    startDate: promo.startDate,
+    endDate: promo.endDate,
+    minTierId: promo.minTierId ?? getPromotionMinTierId(promo),
+    minTierName: promo.minTierName || getDbTierName(promo.minTierId ?? getPromotionMinTierId(promo)),
+    isActive: promo.isActive !== false && promo.status !== 'inactive'
+  };
+}
+
+function normalizeBooking(booking) {
+  const id = booking.id ?? booking.bookingId ?? numId(booking.id);
+  const time = booking.startTime || booking.createdAt || booking.time || booking.bookingTime || '';
+  const timeText = typeof time === 'string' && time.includes(':') ? time.slice(0, 5) : String(time || '-');
+  return {
+    id,
+    bookingId: id,
+    customerName: booking.fullName || booking.customerName || '',
+    vehiclePlate: booking.licensePlate || booking.vehiclePlate || '',
+    serviceName: booking.serviceName || '',
+    date: booking.bookingDate || booking.date || '',
+    time: timeText,
+    status: normalizeBookingStatus(booking.status),
+    totalPrice: Number(booking.totalPrice ?? 0),
+    pointsEarned: booking.pointsEarned ?? booking.totalPointEarned ?? '-'
+  };
+}
+
+function normalizeRedemption(item) {
+  return {
+    redemptionId: item.redemptionId ?? numId(item.id),
+    rewardId: item.rewardId,
+    rewardName: item.rewardName || '',
+    pointsUsed: Number(item.pointsUsed ?? 0),
+    discountAmount: Number(item.discountAmount ?? 0),
+    redemptionDate: item.redemptionDate,
+    bookingId: item.bookingId ?? null,
+    status: item.status || (item.bookingId ? 'USED' : 'AVAILABLE')
+  };
+}
+
+function normalizeCustomerProfile(profile) {
+  const tierName = profile.loyaltyTier?.tierName || profile.loyaltyTier || profile.currentTier || 'BRONZE';
+  return {
+    id: profile.customerId ?? getLoggedInCustomerId(),
+    customerId: profile.customerId ?? getLoggedInCustomerId(),
+    name: profile.fullName || profile.name || '',
+    email: profile.email || '',
+    phone: profile.phoneNumber || profile.phone || '',
+    tier: normalizeTierKey(tierName),
+    points: Number(profile.currentPoints ?? profile.pointsBalance ?? 0),
+    totalVisits: Number(profile.totalVisits ?? 0),
+    totalSpending: Number(profile.totalSpend ?? profile.totalSpending ?? 0)
+  };
+}
+
+async function fetchCustomerProfile(customerId) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const id = customerId ?? getLoggedInCustomerId();
+  const profile = await window.AutoWashAPI.customers.profile(id);
+  return normalizeCustomerProfile(profile);
+}
+
+async function fetchActiveWashServices() {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const list = await window.AutoWashAPI.washServices.active();
+  return (Array.isArray(list) ? list : []).map(normalizeWashService);
+}
+
+async function fetchActivePromotions() {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const list = await window.AutoWashAPI.promotions.active();
+  return (Array.isArray(list) ? list : []).map(normalizePromotion);
+}
+
+async function fetchAvailableSlots(date, washServiceId) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const list = await window.AutoWashAPI.bookings.availableSlots(date, washServiceId);
+  return Array.isArray(list) ? list : [];
+}
+
+async function fetchBookings() {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const list = await window.AutoWashAPI.bookings.list();
+  return (Array.isArray(list) ? list : []).map(normalizeBooking);
+}
+
+async function fetchCustomerBookings(customerId) {
+  const user = getLoggedInUser();
+  const profile = user?.name ? { name: user.name } : await fetchCustomerProfile(customerId).catch(() => null);
+  const customerName = profile?.name || profile?.fullName || user?.name || user?.fullName || '';
+  const bookings = await fetchBookings();
+  if (!customerName) return bookings;
+  return bookings.filter(b => b.customerName === customerName);
+}
+
+async function createBookingRequest(payload) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  return window.AutoWashAPI.bookings.create(payload);
+}
+
+async function confirmBookingArrival(bookingId) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  return window.AutoWashAPI.bookings.confirmArrival(bookingId);
+}
+
+async function completeBooking(bookingId) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  return window.AutoWashAPI.bookings.complete(bookingId);
+}
+
+async function cancelBookingRequest(bookingId) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  return window.AutoWashAPI.bookings.cancel(bookingId);
+}
+
+async function fetchCustomerRewardCatalog() {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const list = await window.AutoWashAPI.rewards.catalog();
+  return (Array.isArray(list) ? list : []).map(normalizeReward);
+}
+
+async function fetchUnusedVouchers(customerId) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const id = customerId ?? getLoggedInCustomerId();
+  const list = await window.AutoWashAPI.rewards.unused(id);
+  return (Array.isArray(list) ? list : []).map(normalizeRedemption);
+}
+
+async function fetchRedemptionHistory(customerId) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  const id = customerId ?? getLoggedInCustomerId();
+  const list = await window.AutoWashAPI.rewards.history(id);
+  return (Array.isArray(list) ? list : []).map(normalizeRedemption);
+}
+
+async function redeemCustomerReward(customerId, rewardId, quantity = 1) {
+  if (!window.AutoWashAPI) throw new Error('API chưa sẵn sàng.');
+  return window.AutoWashAPI.rewards.redeem({
+    customerId: Number(customerId),
+    rewardId: Number(rewardId),
+    quantity: Number(quantity)
+  });
 }

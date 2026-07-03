@@ -278,6 +278,42 @@
     };
   }
 
+  /* --- AUTOWASH API INTEGRATION: LOYALTY TIERS MAPPING --- */
+  function toBackendLoyaltyTier(tier) {
+    return {
+      id: tier.id,
+      tierName: tier.name,
+      requiredVisits: tier.requiredVisits,
+      requiredSpending: tier.requiredSpending,
+      pointMultiplier: tier.pointRate,
+      bookingWindowDays: tier.bookingWindow,
+      discountPercent: tier.discountPercent,
+      benefits: Array.isArray(tier.benefits) ? tier.benefits.join(', ') : (tier.benefits || ''),
+      isActive: tier.isActive ?? true
+    };
+  }
+
+  function fromBackendLoyaltyTier(body, existing) {
+    let benefits = [];
+    if (Array.isArray(body.benefits)) {
+      benefits = body.benefits;
+    } else if (typeof body.benefits === 'string') {
+      benefits = body.benefits.split(',').map(b => b.trim()).filter(Boolean);
+    }
+    return {
+      ...(existing || {}),
+      id: existing?.id || String(body.tierName || '').toLowerCase(),
+      name: body.tierName,
+      requiredVisits: Number(body.requiredVisits ?? 0),
+      requiredSpending: Number(body.requiredSpending ?? 0),
+      pointRate: Number(body.pointMultiplier || 1),
+      bookingWindow: Number(body.bookingWindowDays || 7),
+      discountPercent: Number(body.discountPercent ?? 0),
+      benefits: benefits,
+      isActive: body.isActive ?? true
+    };
+  }
+
   function toBackendTimeSlot(slot) {
     return {
       slotId: numId(slot.slotId || slot.id),
@@ -711,6 +747,11 @@
 
   function handlePromotions(method, parts, body) {
     let promotions = load('promotions', MOCK_DATA.promotions);
+
+    if (method === 'GET' && parts[1] === 'active') {
+      return respond(promotions.filter(p => p.status === 'active').map(toBackendPromotion));
+    }
+
     const id = Number(parts[1]);
 
     if (method === 'GET' && parts.length === 1) return respond(promotions.map(toBackendPromotion));
@@ -745,100 +786,7 @@
     return null;
   }
 
-  function toBackendBookingRecord(record) {
-    return {
-      id: record.id,
-      fullName: record.fullName,
-      licensePlate: record.licensePlate,
-      serviceName: record.serviceName,
-      bookingDate: record.bookingDate,
-      createdAt: record.createdAt,
-      status: record.status,
-      totalPrice: record.totalPrice
-    };
-  }
 
-  function handleBookingsV1(method, parts, params, body) {
-    let records = load('bookingRecords', []);
-
-    if (method === 'GET' && parts[0] === 'available-slots') {
-      const date = params.get('date');
-      const washServiceId = Number(params.get('washServiceId'));
-      const slots = load('timeSlots', []);
-      const service = load('services', MOCK_DATA.services).find(s => numId(s.id) === washServiceId);
-      const duration = service?.duration || service?.durationMinutes || 30;
-      return respond(slots.filter(s => s.isActive !== false).map(slot => ({
-        slotId: slot.slotId,
-        slotName: slot.slotName,
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-        maxCapacity: slot.maxCapacity,
-        isAvailable: true
-      })));
-    }
-
-    if (method === 'GET' && parts.length === 0) {
-      return respond(records.map(toBackendBookingRecord));
-    }
-
-    if (method === 'POST' && parts.length === 0) {
-      const customer = load('customers', MOCK_DATA.customers).find(c => numId(c.id) === Number(body.customerId));
-      const vehicle = load('vehicles', MOCK_DATA.vehicles).find(v => numId(v.vehicleId || v.id) === Number(body.vehicleId));
-      const service = load('services', MOCK_DATA.services).find(s => numId(s.id) === Number(body.washServiceId));
-      const slot = load('timeSlots', []).find(s => Number(s.slotId) === Number(body.slotId));
-      if (!customer || !vehicle || !service) return fail('Invalid booking data');
-
-      const basePrice = Number(service.price || 0);
-      const id = nextNumber(records, 'id');
-      const record = {
-        id,
-        fullName: customer.name,
-        licensePlate: vehicle.licensePlate,
-        serviceName: service.name || service.serviceName,
-        bookingDate: body.bookingDate,
-        createdAt: slot?.startTime ? `${slot.startTime}:00` : '09:00:00',
-        status: 'PENDING',
-        totalPrice: basePrice
-      };
-      records.unshift(record);
-      save('bookingRecords', records);
-
-      return respond({
-        basePrice,
-        discountFromTier: 0,
-        discountFromPromo: 0,
-        discountFromReward: 0,
-        addOn: 'NONE',
-        totalPointEarned: Math.round(basePrice / 1000),
-        finalPrice: basePrice
-      }, 201);
-    }
-
-    const bookingId = Number(parts[0]);
-    const index = records.findIndex(r => Number(r.id) === bookingId);
-    if (index < 0) return fail('Booking not found', 404);
-    const record = records[index];
-
-    if (method === 'PUT' && parts[1] === 'confirm-arrival') {
-      if (record.status !== 'PENDING') return fail("Only 'PENDING' bookings can be CONFIRMED.");
-      records[index].status = 'CONFIRMED';
-      save('bookingRecords', records);
-      return respond(toBackendBookingRecord(records[index]));
-    }
-
-    if (method === 'PUT' && parts[1] === 'complete') {
-      if (record.status !== 'CONFIRMED') return fail("Booking must be 'CONFIRMED' to complete.");
-      records[index].status = 'COMPLETED';
-      save('bookingRecords', records);
-      return respond(toBackendBookingRecord(records[index]));
-    }
-
-    if (method === 'PUT' && parts[1] === 'cancel') {
-      if (record.status === 'COMPLETED') return fail('Cannot cancel a booking that is already COMPLETED.');
-      if (record.status === 'CANCELLED') return fail('This booking has already been cancelled.');
-      records[index].status = 'CANCELLED';
-      save('bookingRecords', records);
-      return respond('Booking has been cancelled successfully');
     }
 
     return null;
@@ -915,6 +863,7 @@
     if (resource === 'admin' && parts[1] === 'wash-services') return handleWashServices(method, parts, body);
     if (resource === 'admin' && parts[1] === 'time-slots') return handleTimeSlots(method, parts, body);
     if (resource === 'promotions') return handlePromotions(method, parts, body);
+    if (resource === 'loyalty-tiers') return handleLoyaltyTiers(method, parts, body);
     if (resource === 'rewards') return handleRewards(method, parts, body);
     if (resource === 'v1' && parts[1] === 'bookings') return handleBookingsV1(method, parts.slice(2), searchParams, body);
     if (resource === 'bookings') return handleBookings(method, parts, body);
@@ -997,6 +946,13 @@
       create: (payload) => request('/api/promotions', { method: 'POST', body: payload }),
       update: (id, payload) => request(`/api/promotions/${id}`, { method: 'PUT', body: payload }),
       remove: (id) => request(`/api/promotions/${id}`, { method: 'DELETE' })
+    },
+    loyaltyTiers: {
+      list: () => request('/api/loyalty-tiers'),
+      listActive: () => request('/api/loyalty-tiers/active'),
+      create: (payload) => request('/api/loyalty-tiers', { method: 'POST', body: payload }),
+      update: (id, payload) => request(`/api/loyalty-tiers/${id}`, { method: 'PUT', body: payload }),
+      remove: (id) => request(`/api/loyalty-tiers/${id}`, { method: 'DELETE' })
     },
     rewards: {
       getAll: () => request('/api/rewards/admin/all'),

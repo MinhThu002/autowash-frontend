@@ -6,7 +6,9 @@ const CSS = `  <link rel="stylesheet" href="assets/css/style.css">
   <link rel="stylesheet" href="assets/css/dashboard.css">
   <link rel="stylesheet" href="assets/css/responsive.css">`;
 
-const SCRIPTS = `  <script src="assets/js/mock-data.js"></script>
+const SCRIPTS = `  <script src="assets/js/api-config.js"></script>
+  <script src="assets/js/mock-api.js"></script>
+  <script src="assets/js/mock-data.js"></script>
   <script src="assets/js/main.js"></script>
   <script src="assets/js/modal.js"></script>`;
 const DASH = `  <script src="assets/js/dashboard.js"></script>`;
@@ -130,7 +132,9 @@ pages['customer-dashboard.html'] = layout('Dashboard', customerSidebar('customer
   <div class="card"><div class="card-header"><h3>Khuyến mãi gợi ý</h3></div><div id="recommendedPromos" style="display:flex;flex-direction:column;gap:0.75rem"></div></div>
 </motion>
 <div class="card"><div class="card-header"><h3>Lịch sử rửa gần đây</h3><a href="booking-history.html">Xem tất cả</a></div><div id="recentHistory"></div></div>
-`, DASH, 'customer-dashboard');
+`, `  <script src="assets/js/loyaltytier.js"></script>
+  <script src="assets/js/promotion.js"></script>
+  <script src="assets/js/dashboard.js"></script>`, 'customer-dashboard');
 
 pages['customer-vehicles.html'] = layout('Xe của tôi', customerSidebar('customer-vehicles.html'), `
 <div class="page-header"><h2>Quản lý xe</h2><button class="btn btn-primary" onclick="openAddVehicle()">+ Thêm xe</button></div>
@@ -207,11 +211,13 @@ const more = {
   <div class="card table-wrapper"><h3>Lịch sử điểm</h3><table class="table" id="pointsHistory"><thead><tr><th>Ngày</th><th>Mô tả</th><th>Điểm</th></tr></thead><tbody></tbody></table></div>
   <div class="card"><h3>Đổi thưởng</h3><div class="rewards-grid" id="rewardsList"></div></div>
 </motion>
-`, DASH, 'loyalty'),
+`, `  <script src="assets/js/loyaltytier.js"></script>
+  <script src="assets/js/dashboard.js"></script>`, 'loyalty'),
 
   'promotions.html': layout('Khuyến mãi', customerSidebar('promotions.html'), `
 <div class="grid grid-3" id="promotionsGrid"></div>
-`, DASH, 'promotions'),
+`, `  <script src="assets/js/promotion.js"></script>
+  <script src="assets/js/dashboard.js"></script>`, 'promotions'),
 
   'admin-dashboard.html': layout('Admin Dashboard', adminSidebar('admin-dashboard.html'), `
 <div class="stats-grid">
@@ -241,12 +247,11 @@ const more = {
 
   'admin-services.html': layout('Dịch vụ', adminSidebar('admin-services.html'), `
 <div class="page-header"><h2>Dịch vụ</h2><button class="btn btn-primary" onclick="openAddService()">+ Thêm dịch vụ</button></div>
-<div class="card table-wrapper"><table class="table" id="servicesTable"><thead><tr><th>Tên</th><th>Loại xe</th><th>TG</th><th>Giá</th><th>Mô tả</th><th>TT</th><th></th></tr></thead><tbody></tbody></table></div>
-<div class="modal-overlay" id="serviceModal"><motion class="modal"><div class="modal-header"><h3>Dịch vụ</h3><button class="modal-close" data-modal-close="serviceModal">&times;</button></div>
+<div class="card table-wrapper"><table class="table" id="servicesTable"><thead><tr><th>Tên</th><th>TG</th><th>Giá</th><th>Mô tả</th><th>TT</th><th></th></tr></thead><tbody></tbody></table></div>
+<div class="modal-overlay" id="serviceModal"><div class="modal"><div class="modal-header"><h3>Dịch vụ</h3><button class="modal-close" data-modal-close="serviceModal">&times;</button></div>
 <form id="serviceForm"><div class="modal-body"><input type="hidden" id="serviceId">
 <div class="form-group"><label>Tên</label><input id="serviceName" required></div>
-<div class="form-row"><div class="form-group"><label>Loại xe</label><select id="serviceVehicleType"><option>Car</option><option>Motorbike</option></select></div>
-<div class="form-group"><label>Thời lượng (phút)</label><input type="number" id="serviceDuration" required></div></div>
+<div class="form-group"><label>Thời lượng (phút)</label><input type="number" id="serviceDuration" required></div>
 <div class="form-group"><label>Giá</label><input type="number" id="servicePrice" required></div>
 <div class="form-group"><label>Mô tả</label><textarea id="serviceDescription"></textarea></div>
 <div class="form-group"><label>Trạng thái</label><select id="serviceActive"><option value="true">Active</option><option value="false">Inactive</option></select></div>
@@ -254,8 +259,30 @@ const more = {
 `, DASH, 'admin-services'),
 
   'admin-loyalty-tiers.html': layout('Hạng thành viên', adminSidebar('admin-loyalty-tiers.html'), `
-<div class="card table-wrapper"><table class="table" id="tiersTable"><thead><tr><th>Hạng</th><th>Lượt</th><th>Chi tiêu</th><th>Tỷ lệ điểm</th><th>Cửa sổ đặt</th><th>Giảm %</th><th>Quyền lợi</th></tr></thead><tbody></tbody></table></div>
-`, DASH, 'admin-loyalty-tiers'),
+<div class="page-header"><h2>Hạng thành viên</h2><button class="btn btn-primary" onclick="openAddLoyaltyTier()">+ Thêm hạng</button></div>
+<div class="card table-wrapper"><table class="table" id="tiersTable"><thead><tr><th>Hạng</th><th>Chi tiêu tối thiểu</th><th>Lượt yêu cầu</th><th>Tỷ lệ điểm</th><th>Cửa sổ đặt (ngày)</th><th>Giảm %</th><th>Độ ưu tiên</th><th>TT</th><th></th></tr></thead><tbody></tbody></table></div>
+<div class="modal-overlay" id="tierModal"><div class="modal"><div class="modal-header"><h3>Hạng thành viên</h3><button class="modal-close" data-modal-close="tierModal">&times;</button></div>
+<form id="tierForm"><div class="modal-body">
+<input type="hidden" id="tierId">
+<div class="form-group"><label>Tên hạng</label><input id="tierName" required placeholder="Ví dụ: Silver, Gold"></div>
+<div class="form-row">
+  <div class="form-group"><label>Chi tiêu tối thiểu (VND)</label><input type="number" id="tierMinSpending" required min="0"></div>
+  <div class="form-group"><label>Lượt yêu cầu</label><input type="number" id="tierMinVisits" required min="0"></div>
+</div>
+<div class="form-row">
+  <div class="form-group"><label>Tỷ lệ điểm</label><input type="number" step="0.1" id="tierPointMultiplier" required min="1"></div>
+  <div class="form-group"><label>Cửa sổ đặt lịch (ngày)</label><input type="number" id="tierBookingWindowDays" required min="1"></div>
+</div>
+<div class="form-row">
+  <div class="form-group"><label>Phần trăm giảm (%)</label><input type="number" id="tierDiscountPercent" required min="0" max="100"></div>
+  <div class="form-group"><label>Mức độ ưu tiên (số nguyên dương)</label><input type="number" id="tierPriorityLevel" required min="1"></div>
+</div>
+<div class="form-group"><label>Trạng thái</label><select id="tierIsActive"><option value="active">Hoạt động</option><option value="inactive">Ngừng</option></select></div>
+</div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-modal-close="tierModal">Hủy</button><button type="submit" class="btn btn-primary">Lưu</button></div></form></div></div>
+`, `  <script src="assets/js/api-config.js"></script>
+  <script src="assets/js/mock-api.js"></script>
+  <script src="assets/js/loyaltytier.js"></script>
+  <script src="assets/js/dashboard.js"></script>`, 'admin-loyalty-tiers'),
 
   'admin-promotions.html': layout('Khuyến mãi', adminSidebar('admin-promotions.html'), `
 <div class="page-header"><h2>Khuyến mãi</h2><button class="btn btn-primary" onclick="openAddPromotion()">+ Thêm KM</button></div>
@@ -268,11 +295,36 @@ const more = {
 <div class="form-group"><label>Giá trị</label><input type="number" id="promoDiscountValue" required></div></div>
 <div class="form-row"><div class="form-group"><label>Từ ngày</label><input type="date" id="promoStart" required></div>
 <div class="form-group"><label>Đến ngày</label><input type="date" id="promoEnd" required></div></div>
-<div class="form-row"><motion class="form-group"><label>Hạng</label><select id="promoTier"><option value="all">Tất cả</option><option value="silver">Silver+</option><option value="gold">Gold+</option><option value="platinum">Platinum</option></select></div>
+<div class="form-row"><motion class="form-group"><label>Hạng</label><select id="promoTier"><option value="silver">Silver+</option><option value="gold">Gold+</option><option value="platinum">Platinum</option></select></div>
 <div class="form-group"><label>Giới hạn</label><input type="number" id="promoLimit" required></div></div>
 <div class="form-group"><label>Trạng thái</label><select id="promoStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-modal-close="promotionModal">Hủy</button><button type="submit" class="btn btn-primary">Lưu</button></motion></form></div></div>
-`, DASH, 'admin-promotions'),
+`, `  <script src="assets/js/api-config.js"></script>
+  <script src="assets/js/mock-api.js"></script>
+  <script src="assets/js/loyaltytier.js"></script>
+  <script src="assets/js/promotion.js"></script>
+  <script src="assets/js/dashboard.js"></script>`, 'admin-promotions'),
+
+  'admin-rewards.html': layout('Quà tặng', adminSidebar('admin-rewards.html'), `
+<div class="page-header"><h2>Quản lý quà tặng</h2><button class="btn btn-primary" onclick="openAddReward()">+ Thêm quà tặng</button></div>
+<div class="card table-wrapper"><table class="table" id="rewardsTable"><thead><tr><th>ID</th><th>Tên quà</th><th>Mô tả</th><th>Điểm đổi</th><th>Trị giá giảm</th><th>Số lượng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody></tbody></table></div>
+<div class="modal-overlay" id="rewardModal"><div class="modal"><div class="modal-header"><h3 id="rewardModalTitle">Thêm quà tặng</h3><button class="modal-close" data-modal-close="rewardModal">&times;</button></div>
+<form id="rewardForm"><div class="modal-body">
+<input type="hidden" id="rewardId">
+<div class="form-group"><label>Tên quà tặng</label><input id="rewardName" required placeholder="Ví dụ: Voucher giảm 50k"></div>
+<div class="form-group"><label>Mô tả</label><textarea id="rewardDescription" placeholder="Mô tả quà tặng..."></textarea></div>
+<div class="form-row">
+  <div class="form-group"><label>Điểm yêu cầu</label><input type="number" id="rewardPoints" required min="1"></div>
+  <div class="form-group"><label>Trị giá giảm (đ)</label><input type="number" id="rewardDiscount" required min="0"></div>
+</div>
+<div class="form-row">
+  <div class="form-group"><label>Số lượng kho</label><input type="number" id="rewardStock" required min="0"></div>
+  <div class="form-group"><label>Trạng thái</label><select id="rewardActive"><option value="true">Kích hoạt</option><option value="false">Ngừng kích hoạt</option></select></div>
+</div>
+</div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-modal-close="rewardModal">Hủy</button><button type="submit" class="btn btn-primary">Lưu</button></div></form></div></div>
+`, `  <script src="assets/js/api-config.js"></script>
+  <script src="assets/js/mock-api.js"></script>
+  <script src="assets/js/dashboard.js"></script>`, 'admin-rewards'),
 
   'admin-analytics.html': layout('Analytics', adminSidebar('admin-analytics.html'), `
 <div class="analytics-grid">

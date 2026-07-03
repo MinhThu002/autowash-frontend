@@ -200,6 +200,11 @@ function updatePriceSummary() {
 async function confirmBooking(e) {
   e.preventDefault();
 
+  if (!getAuthorizedUser(['customer'])) {
+    showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    return;
+  }
+
   const customerId = getLoggedInCustomerId();
   const vehicleId = document.getElementById('bookingVehicle').value;
   const serviceId = document.getElementById('bookingService').value;

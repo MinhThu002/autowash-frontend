@@ -495,6 +495,10 @@ function renderAdminBookings() {
 
 async function confirmBookingAction(bookingId) {
   if (!confirm('Xác nhận khách đã đến tiệm?')) return;
+  if (!getAuthorizedUser(['admin', 'staff'])) {
+    showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    return;
+  }
   try {
     await confirmBookingArrival(bookingId);
     showToast('Đã xác nhận booking.');
@@ -506,6 +510,10 @@ async function confirmBookingAction(bookingId) {
 
 async function completeBookingAction(bookingId) {
   if (!confirm('Hoàn thành booking và tích điểm cho khách?')) return;
+  if (!getAuthorizedUser(['admin', 'staff'])) {
+    showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    return;
+  }
   try {
     await completeBooking(bookingId);
     showToast('Booking đã hoàn thành.');
@@ -517,6 +525,10 @@ async function completeBookingAction(bookingId) {
 
 async function cancelBookingAction(bookingId) {
   if (!confirm('Hủy booking này?')) return;
+  if (!getAuthorizedUser(['admin', 'staff'])) {
+    showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    return;
+  }
   try {
     await cancelBookingRequest(bookingId);
     showToast('Đã hủy booking.');
@@ -569,8 +581,7 @@ function renderAdminPromotions() {
 }
 
 function renderAdminRewards() {
-  const user = requireAuth(['admin']);
-  if (!user) return;
+  if (!requireAuth(['admin'])) return;
 
   const tbody = document.querySelector('#rewardsTable tbody');
   if (!tbody) return;
@@ -653,8 +664,8 @@ function updateScheduleStatus(id, status) {
 }
 
 function setUserNav(customer) {
-  const user = requireAuth(['customer']);
-  if (!user) return;
+  const user = getLoggedInUser();
+  if (!user || mapBackendRole(user.role) !== 'customer') return;
   const name = customer?.name || user.name || 'Khách hàng';
   document.querySelectorAll('.user-name').forEach(el => el.textContent = name);
   document.querySelectorAll('.user-tier').forEach(el => {
@@ -799,7 +810,10 @@ function openAddPromotion() {
 
 async function saveReward(e) {
   e.preventDefault();
-  if (!requireAuth(['admin'])) return;
+  if (!getAuthorizedUser(['admin'])) {
+    showToast('Bạn cần đăng nhập admin để lưu quà tặng.');
+    return;
+  }
 
   const rewardId = document.getElementById('rewardId').value;
   const payload = buildRewardRequest({
@@ -836,7 +850,10 @@ async function saveReward(e) {
 }
 
 async function editReward(id) {
-  if (!requireAuth(['admin'])) return;
+  if (!getAuthorizedUser(['admin'])) {
+    showToast('Bạn cần đăng nhập admin.');
+    return;
+  }
 
   let reward;
   try {
@@ -861,7 +878,10 @@ async function editReward(id) {
 }
 
 async function deleteReward(id) {
-  if (!requireAuth(['admin'])) return;
+  if (!getAuthorizedUser(['admin'])) {
+    showToast('Bạn cần đăng nhập admin.');
+    return;
+  }
   if (!confirm('Bạn có chắc muốn vô hiệu hóa quà tặng này?')) return;
 
   if (!window.AutoWashAPI) {

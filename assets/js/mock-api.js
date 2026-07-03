@@ -11,7 +11,16 @@
   }
 
   function getAuthToken() {
-    return localStorage.getItem('autowash_token');
+    let token = localStorage.getItem('autowash_token');
+    if (token) return token;
+    try {
+      const user = JSON.parse(localStorage.getItem('autowash_user') || 'null');
+      token = user?.token || null;
+      if (token) localStorage.setItem('autowash_token', token);
+      return token;
+    } catch (e) {
+      return null;
+    }
   }
 
   async function realFetch(path, options = {}) {

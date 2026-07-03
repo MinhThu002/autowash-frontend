@@ -1,5 +1,6 @@
 /* AutoWash Pro - Main */
 document.addEventListener('DOMContentLoaded', () => {
+  syncAuthToken();
   initStorage();
   initSidebar();
   initLandingMenu();
@@ -56,10 +57,34 @@ function showToast(message, duration = 3000) {
 }
 
 function mapBackendRole(roleName) {
-  const normalized = String(roleName || '').replace(/^ROLE_/, '').toUpperCase();
-  if (normalized === 'MANAGER') return 'admin';
+  const raw = String(roleName || '').trim();
+  const lower = raw.toLowerCase();
+  if (lower === 'admin' || lower === 'staff' || lower === 'customer') return lower;
+
+  const normalized = raw.replace(/^ROLE_/, '').toUpperCase();
+  if (normalized === 'MANAGER' || normalized === 'ADMIN') return 'admin';
   if (normalized === 'STAFF') return 'staff';
+  if (normalized === 'CUSTOMER') return 'customer';
   return 'customer';
+}
+
+function getAuthorizedUser(roles) {
+  const stored = localStorage.getItem('autowash_user');
+  if (!stored) return null;
+  try {
+    const user = JSON.parse(stored);
+    user.role = mapBackendRole(user.role);
+    if (roles?.length && !roles.includes(user.role)) return null;
+    return user;
+  } catch (e) {
+    return null;
+  }
+}
+
+function syncAuthToken() {
+  if (localStorage.getItem('autowash_token')) return;
+  const user = getLoggedInUser();
+  if (user?.token) localStorage.setItem('autowash_token', user.token);
 }
 
 function persistAuthSession(auth, remember) {
@@ -363,24 +388,13 @@ function logout() {
   window.location.href = 'login.html';
 }
 
-function requireAuth(roles) {
-  const stored = localStorage.getItem('autowash_user');
-  if (!stored) {
+function requireAuth(roles, options = {}) {
+  const redirect = options.redirect !== false;
+  const user = getAuthorizedUser(roles);
+  if (!user && redirect) {
     window.location.href = 'login.html';
-    return null;
   }
-  try {
-    const user = JSON.parse(stored);
-    user.role = mapBackendRole(user.role);
-    if (roles && !roles.includes(user.role)) {
-      window.location.href = 'login.html';
-      return null;
-    }
-    return user;
-  } catch (e) {
-    window.location.href = 'login.html';
-    return null;
-  }
+  return user;
 }
 
 function getUserInitials(name) {

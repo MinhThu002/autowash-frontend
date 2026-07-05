@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
@@ -11,7 +11,7 @@
 <body data-page="admin-loyalty-tiers">
 <div class="app-layout">
   <div class="sidebar-overlay"></div>
-  <aside class="sidebar"><div class="sidebar-header"><a href="index.html" class="sidebar-logo">🚿 Auto<span>Wash</span> Pro</a><div class="sidebar-role">Quản trị</div></div><nav class="sidebar-nav"><ul><li><a href="admin-dashboard.html" class=""><span class="nav-icon">📊</span>Dashboard</a></li><li><a href="admin-customers.html" class=""><span class="nav-icon">👥</span>Khách hàng</a></li><li><a href="admin-bookings.html" class=""><span class="nav-icon">📅</span>Bookings</a></li><li><a href="admin-services.html" class=""><span class="nav-icon">🔧</span>Dịch vụ</a></li><li><a href="admin-time-slots.html" class=""><span class="nav-icon">⏰</span>Khung giờ</a></li><li><a href="admin-loyalty-tiers.html" class="active"><span class="nav-icon">🏆</span>Hạng TV</a></li><li><a href="admin-promotions.html" class=""><span class="nav-icon">🎁</span>Khuyến mãi</a></li><li><a href="admin-analytics.html" class=""><span class="nav-icon">📈</span>Analytics</a></li></ul></nav><div class="sidebar-footer"><a href="#" onclick="logout();return false">🚪 Đăng xuất</a></div></aside>
+
   <main class="main-content">
     <header class="navbar">
       <div class="navbar-left">
@@ -26,16 +26,37 @@
       </div>
     </header>
     <div class="page-content">
-      
-<div class="card table-wrapper"><table class="table" id="tiersTable"><thead><tr><th>Hạng</th><th>Lượt</th><th>Chi tiêu</th><th>Tỷ lệ điểm</th><th>Cửa sổ đặt</th><th>Giảm %</th><th>Quyền lợi</th></tr></thead><tbody></tbody></table></div>
+<div class="page-header"><h2>Hạng thành viên</h2><button class="btn btn-primary" onclick="openAddLoyaltyTier()">+ Thêm hạng</button></div>
+<div class="card table-wrapper"><table class="table" id="tiersTable"><thead><tr><th>Hạng</th><th>Chi tiêu tối thiểu</th><th>Lượt yêu cầu</th><th>Tỷ lệ điểm</th><th>Cửa sổ đặt (ngày)</th><th>Giảm %</th><th>Độ ưu tiên</th><th>TT</th><th></th></tr></thead><tbody></tbody></table></div>
+<div class="modal-overlay" id="tierModal"><div class="modal"><div class="modal-header"><h3>Hạng thành viên</h3><button class="modal-close" data-modal-close="tierModal">&times;</button></div>
+<form id="tierForm"><div class="modal-body">
+<input type="hidden" id="tierId">
+<div class="form-group"><label>Tên hạng</label><input id="tierName" required placeholder="Ví dụ: Silver, Gold"></div>
+<div class="form-row">
+  <div class="form-group"><label>Chi tiêu tối thiểu (VND)</label><input type="number" id="tierMinSpending" required min="0"></div>
+  <div class="form-group"><label>Lượt yêu cầu</label><input type="number" id="tierMinVisits" required min="0"></div>
+</div>
+<div class="form-row">
+  <div class="form-group"><label>Tỷ lệ điểm</label><input type="number" step="0.1" id="tierPointMultiplier" required min="1"></div>
+  <div class="form-group"><label>Cửa sổ đặt lịch (ngày)</label><input type="number" id="tierBookingWindowDays" required min="1"></div>
+</div>
+<div class="form-row">
+  <div class="form-group"><label>Phần trăm giảm (%)</label><input type="number" id="tierDiscountPercent" required min="0" max="100"></div>
+  <div class="form-group"><label>Mức độ ưu tiên (số nguyên dương)</label><input type="number" id="tierPriorityLevel" required min="1"></div>
+</div>
+<div class="form-group"><label>Trạng thái</label><select id="tierIsActive"><option value="active">Hoạt động</option><option value="inactive">Ngừng</option></select></div>
+</div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-modal-close="tierModal">Hủy</button><button type="submit" class="btn btn-primary">Lưu</button></div></form></div></div>
 </div>
   </main>
 </div>
-  <script src="assets/js/mock-data.js"></script>
   <script src="assets/js/api-config.js"></script>
   <script src="assets/js/mock-api.js"></script>
+  <script src="assets/js/mock-data.js"></script>
   <script src="assets/js/main.js"></script>
   <script src="assets/js/modal.js"></script>
+  <script src="assets/js/api-config.js"></script>
+  <script src="assets/js/mock-api.js"></script>
+  <script src="assets/js/loyaltytier.js"></script>
   <script src="assets/js/dashboard.js"></script>
 </body>
 </html>

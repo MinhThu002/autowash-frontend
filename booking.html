@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
@@ -36,6 +36,7 @@
         <div class="form-group"><label>Ngày</label><input type="date" id="bookingDate" required></div>
         <div class="form-group"><label>Khuyến mãi</label><select id="bookingPromotion"><option value="">Không dùng</option></select></div>
       </div>
+      <div class="form-group"><label>Voucher đổi thưởng</label><select id="bookingVouchers"><option value="">Không có voucher</option></select></div>
       <div class="form-group"><label>Khung giờ</label><div id="timeSlots" class="time-slots"></div></div>
       <button type="submit" class="btn btn-primary btn-lg">Xác nhận đặt lịch</button>
     </form>
@@ -46,6 +47,7 @@
       <div class="booking-summary-row"><span>Giá gốc</span><span id="summaryBase">0đ</span></div>
       <div class="booking-summary-row"><span>Giảm hạng</span><span id="summaryTierDiscount">-0đ</span></div>
       <div class="booking-summary-row"><span>Giảm KM</span><span id="summaryPromoDiscount">-0đ</span></div>
+      <div class="booking-summary-row"><span>Giảm voucher</span><span id="summaryVoucherDiscount">-0đ</span></div>
       <div class="booking-summary-row total"><span>Tổng cộng</span><span id="summaryTotal">0đ</span></div>
       <div class="booking-summary-row"><span>Điểm dự kiến</span><span id="summaryPoints" class="text-primary">+0 điểm</span></div>
     </div>
@@ -54,9 +56,9 @@
 </div>
   </main>
 </div>
-  <script src="assets/js/mock-data.js"></script>
   <script src="assets/js/api-config.js"></script>
   <script src="assets/js/mock-api.js"></script>
+  <script src="assets/js/mock-data.js"></script>
   <script src="assets/js/main.js"></script>
   <script src="assets/js/modal.js"></script>
   <script src="assets/js/dashboard.js"></script>

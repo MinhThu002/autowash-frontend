@@ -11,7 +11,16 @@
   }
 
   function getAuthToken() {
-    return localStorage.getItem('autowash_token');
+    let token = localStorage.getItem('autowash_token');
+    if (token) return token;
+    try {
+      const user = JSON.parse(localStorage.getItem('autowash_user') || 'null');
+      token = user?.token || null;
+      if (token) localStorage.setItem('autowash_token', token);
+      return token;
+    } catch (e) {
+      return null;
+    }
   }
 
   async function realFetch(path, options = {}) {
@@ -45,7 +54,10 @@
       'POST /api/auth/reset-password',
       'POST /api/auth/google'
     ],
-    customers: ['GET /api/customers/profile?customerId=1'],
+    customers: [
+      'GET /api/customers',
+      'GET /api/customers/profile?customerId=1'
+    ],
     vehicles: [
       'GET /api/vehicles/customer?customerId=1',
       'POST /api/vehicles',
@@ -66,9 +78,18 @@
     ],
     promotions: [
       'GET /api/promotions',
+      'GET /api/promotions/active',
       'POST /api/promotions',
       'PUT /api/promotions/{id}',
       'DELETE /api/promotions/{id}'
+    ],
+    bookingsV1: [
+      'GET /api/v1/bookings',
+      'GET /api/v1/bookings/available-slots',
+      'POST /api/v1/bookings',
+      'PUT /api/v1/bookings/{id}/confirm-arrival',
+      'PUT /api/v1/bookings/{id}/complete',
+      'PUT /api/v1/bookings/{id}/cancel'
     ],
     demoExtensions: [
       'GET /api/bookings',
@@ -77,6 +98,16 @@
       'GET /api/dashboard/analytics',
       'GET /api/staff/schedule',
       'PATCH /api/staff/schedule/{id}/status'
+    ],
+    rewards: [
+      'GET /api/rewards/admin/all',
+      'GET /api/rewards/customer/catalog',
+      'GET /api/rewards/customer/history/{customerId}',
+      'GET /api/rewards/customer/unused/{customerId}',
+      'POST /api/rewards/customer/redeem',
+      'POST /api/rewards/admin/create',
+      'PUT /api/rewards/admin/update/{id}',
+      'DELETE /api/rewards/admin/delete/{id}'
     ]
   };
 
@@ -145,6 +176,24 @@
         isActive: true
       })));
     }
+    if (!localStorage.getItem('autowash_rewardCatalog')) {
+      save('rewardCatalog', MOCK_DATA.rewardCatalog);
+    }
+    if (!localStorage.getItem('autowash_redemptions')) {
+      save('redemptions', []);
+    }
+    if (!localStorage.getItem('autowash_bookingRecords')) {
+      save('bookingRecords', MOCK_DATA.bookings.map((b, index) => ({
+        id: index + 1,
+        fullName: b.customerName,
+        licensePlate: b.vehiclePlate,
+        serviceName: b.serviceName,
+        bookingDate: b.date,
+        createdAt: `${b.time}:00`,
+        status: String(b.status || 'pending').toUpperCase(),
+        totalPrice: b.totalPrice
+      })));
+    }
   }
 
   function addMinutes(time, minutes) {
@@ -154,13 +203,13 @@
   }
 
   function tierIdFromName(tier) {
-    const order = { member: 1, silver: 2, gold: 3, platinum: 4 };
+    const order = { member: 1, bronze: 1, silver: 2, gold: 3, platinum: 4, diamond: 4 };
     return order[String(tier || 'member').toLowerCase()] || 1;
   }
 
   function tierNameFromId(id) {
-    const tier = MOCK_DATA.loyaltyTiers[id - 1];
-    return tier ? tier.name : 'All Tiers';
+    const tier = MOCK_DATA.dbLoyaltyTiers.find(t => t.tierId === Number(id));
+    return tier ? tier.tierName : 'All Tiers';
   }
 
   function toBackendCustomer(customer) {
@@ -177,14 +226,33 @@
     };
   }
 
+  function toBackendCustomerList(customer) {
+    const tierMap = { member: 'BRONZE', silver: 'SILVER', gold: 'GOLD', platinum: 'DIAMOND' };
+    const tierKey = customer.tier || customer.currentTier || 'member';
+    return {
+      fullName: customer.fullName || customer.name,
+      phoneNumber: customer.phoneNumber || customer.phone,
+      email: customer.email,
+      loyaltyTier: customer.loyaltyTier || tierMap[tierKey] || String(tierKey).toUpperCase(),
+      currentPoints: Number(customer.currentPoints ?? customer.points ?? 0),
+      totalVisits: Number(customer.totalVisits ?? 0),
+      totalSpend: Number(customer.totalSpend ?? customer.totalSpending ?? 0)
+    };
+  }
+
   function toBackendVehicle(vehicle) {
     return {
       vehicleId: numId(vehicle.vehicleId || vehicle.id),
       licensePlate: vehicle.licensePlate,
       vehicleType: vehicle.vehicleType,
       brand: vehicle.brand,
-      color: vehicle.color
+      color: vehicle.color,
+      isActive: vehicle.isActive !== false
     };
+  }
+
+  function isVehicleActive(vehicle) {
+    return vehicle.isActive !== false;
   }
 
   function toBackendWashService(service) {
@@ -211,6 +279,42 @@
     };
   }
 
+  /* --- AUTOWASH API INTEGRATION: LOYALTY TIERS MAPPING --- */
+  function toBackendLoyaltyTier(tier) {
+    return {
+      id: tier.id,
+      tierName: tier.name,
+      requiredVisits: tier.requiredVisits,
+      requiredSpending: tier.requiredSpending,
+      pointMultiplier: tier.pointRate,
+      bookingWindowDays: tier.bookingWindow,
+      discountPercent: tier.discountPercent,
+      benefits: Array.isArray(tier.benefits) ? tier.benefits.join(', ') : (tier.benefits || ''),
+      isActive: tier.isActive ?? true
+    };
+  }
+
+  function fromBackendLoyaltyTier(body, existing) {
+    let benefits = [];
+    if (Array.isArray(body.benefits)) {
+      benefits = body.benefits;
+    } else if (typeof body.benefits === 'string') {
+      benefits = body.benefits.split(',').map(b => b.trim()).filter(Boolean);
+    }
+    return {
+      ...(existing || {}),
+      id: existing?.id || String(body.tierName || '').toLowerCase(),
+      name: body.tierName,
+      requiredVisits: Number(body.requiredVisits ?? 0),
+      requiredSpending: Number(body.requiredSpending ?? 0),
+      pointRate: Number(body.pointMultiplier || 1),
+      bookingWindow: Number(body.bookingWindowDays || 7),
+      discountPercent: Number(body.discountPercent ?? 0),
+      benefits: benefits,
+      isActive: body.isActive ?? true
+    };
+  }
+
   function toBackendTimeSlot(slot) {
     return {
       slotId: numId(slot.slotId || slot.id),
@@ -223,7 +327,9 @@
   }
 
   function toBackendPromotion(promotion) {
-    const minTierId = promotion.minTierId || (promotion.targetTier === 'all' ? null : tierIdFromName(promotion.targetTier));
+    const minTierId = promotion.minTierId != null
+      ? Number(promotion.minTierId)
+      : (promotion.targetTier === 'all' || !promotion.targetTier ? null : tierIdFromName(promotion.targetTier));
     return {
       promoId: numId(promotion.promoId || promotion.id),
       promoName: promotion.promoName || promotion.name,
@@ -239,7 +345,6 @@
 
   function fromBackendPromotion(body, existing) {
     const minTierId = body.minTierId == null ? null : Number(body.minTierId);
-    const tierIds = { 1: 'member', 2: 'silver', 3: 'gold', 4: 'platinum' };
     return {
       ...(existing || {}),
       id: existing?.id || legacyId('promo', body.promoId || Date.now()),
@@ -249,7 +354,7 @@
       discountValue: Number(body.discountAmount ?? body.discountValue ?? 0),
       startDate: body.startDate,
       endDate: body.endDate,
-      targetTier: minTierId ? tierIds[minTierId] : 'all',
+      minTierId,
       usageLimit: body.usageLimit || existing?.usageLimit || 100,
       usedCount: existing?.usedCount || 0,
       status: body.status || 'active'
@@ -320,10 +425,38 @@
 
     if (method === 'POST' && parts[1] === 'google') {
       if (!body.token) return fail('Google ID Token cannot be blank', 401);
+
+      let email = 'google.user@gmail.com';
+      let name = 'Google User';
+      try {
+        const payload = JSON.parse(atob(body.token.split('.')[1]));
+        email = payload.email || email;
+        name = payload.name || payload.given_name || name;
+      } catch (e) { /* mock fallback */ }
+
+      const customers = load('customers', MOCK_DATA.customers);
+      let customer = customers.find(c => c.email === email);
+      if (!customer) {
+        const id = nextNumber(customers, 'customerId', 'id');
+        customer = {
+          id: legacyId('cust', id),
+          name,
+          phone: '',
+          email,
+          tier: 'member',
+          points: 0,
+          totalVisits: 0,
+          totalSpending: 0,
+          status: 'active'
+        };
+        customers.push(customer);
+        save('customers', customers);
+      }
+
       return respond({
-        id: 1,
-        loginKey: 'google.user@gmail.com',
-        fullName: 'Google User',
+        id: numId(customer.id),
+        loginKey: email,
+        fullName: customer.name || name,
         roleName: 'ROLE_CUSTOMER',
         token: 'mock-google-jwt-token'
       });
@@ -333,6 +466,11 @@
   }
 
   function handleCustomers(method, parts, params) {
+    if (method === 'GET' && parts.length === 1) {
+      const customers = load('customers', MOCK_DATA.customers);
+      return respond(customers.map(toBackendCustomerList));
+    }
+
     if (method === 'GET' && parts[1] === 'profile') {
       const customerId = params.get('customerId');
       const customer = load('customers', MOCK_DATA.customers).find(c => numId(c.id) === Number(customerId));
@@ -346,19 +484,25 @@
 
     if (method === 'GET' && parts[1] === 'customer') {
       const customerId = Number(params.get('customerId'));
-      return respond(vehicles.filter(v => numId(v.customerId) === customerId).map(toBackendVehicle));
+      return respond(
+        vehicles
+          .filter(v => numId(v.customerId) === customerId && isVehicleActive(v))
+          .map(toBackendVehicle)
+      );
     }
 
     if (method === 'POST' && parts.length === 1) {
       const id = nextNumber(vehicles, 'vehicleId', 'id');
       const item = {
         id: legacyId('veh', id),
+        vehicleId: id,
         customerId: legacyId('cust', body.customerId),
         licensePlate: body.licensePlate,
         vehicleType: body.vehicleType,
         brand: body.brand || '',
         color: body.color || '',
-        notes: body.notes || ''
+        notes: body.notes || '',
+        isActive: true
       };
       vehicles.push(item);
       save('vehicles', vehicles);
@@ -366,7 +510,7 @@
     }
 
     const id = Number(parts[1]);
-    const index = vehicles.findIndex(v => numId(v.id) === id);
+    const index = vehicles.findIndex(v => numId(v.vehicleId || v.id) === id);
     if (index < 0) return fail('Vehicle not found');
 
     if (method === 'PUT') {
@@ -383,9 +527,146 @@
     }
 
     if (method === 'DELETE') {
-      vehicles = vehicles.filter(v => numId(v.id) !== id);
+      vehicles[index] = { ...vehicles[index], isActive: false };
       save('vehicles', vehicles);
       return respond(`Vehicle deleted successfully with ID: ${id}`);
+    }
+
+    return null;
+  }
+
+  function toBackendReward(reward) {
+    return {
+      rewardId: numId(reward.rewardId || reward.id),
+      rewardName: reward.rewardName || reward.name,
+      description: reward.description || '',
+      pointsRequired: Number(reward.pointsRequired ?? reward.pointsCost ?? 0),
+      discountAmount: Number(reward.discountAmount ?? 0),
+      stockQuantity: Number(reward.stockQuantity ?? 0),
+      isActive: reward.isActive !== false
+    };
+  }
+
+  function handleRewards(method, parts, body) {
+    let rewards = load('rewardCatalog', MOCK_DATA.rewardCatalog);
+
+    if (method === 'GET' && parts[1] === 'admin' && parts[2] === 'all') {
+      return respond(
+        [...rewards]
+          .sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired))
+          .map(toBackendReward)
+      );
+    }
+
+    if (method === 'GET' && parts[1] === 'customer' && parts[2] === 'catalog') {
+      return respond(
+        rewards
+          .filter(r => r.isActive !== false && Number(r.stockQuantity) > 0)
+          .sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired))
+          .map(toBackendReward)
+      );
+    }
+
+    if (method === 'POST' && parts[1] === 'customer' && parts[2] === 'redeem') {
+      const customerId = Number(body.customerId);
+      const rewardId = Number(body.rewardId);
+      const quantity = Number(body.quantity || 1);
+      const reward = rewards.find(r => numId(r.rewardId || r.id) === rewardId);
+      if (!reward || reward.isActive === false) return fail('Reward not found');
+      if (Number(reward.stockQuantity) < quantity) return fail('Not enough stock');
+
+      const customers = load('customers', MOCK_DATA.customers);
+      const customer = customers.find(c => numId(c.id) === customerId);
+      if (!customer) return fail('Customer not found');
+
+      const pointsNeeded = Number(reward.pointsRequired) * quantity;
+      if (Number(customer.points) < pointsNeeded) return fail('Not enough points');
+
+      customer.points -= pointsNeeded;
+      reward.stockQuantity = Number(reward.stockQuantity) - quantity;
+      save('customers', customers);
+      save('rewardCatalog', rewards);
+
+      let redemptions = load('redemptions', []);
+      const redemptionId = nextNumber(redemptions, 'redemptionId', 'id');
+      const item = {
+        redemptionId,
+        customerId,
+        pointsUsed: pointsNeeded,
+        redemptionDate: new Date().toISOString(),
+        rewardId,
+        rewardName: reward.rewardName || reward.name,
+        discountAmount: Number(reward.discountAmount || 0),
+        bookingId: null,
+        status: 'AVAILABLE'
+      };
+      redemptions.unshift(item);
+      save('redemptions', redemptions);
+      return respond(item, 201);
+    }
+
+    if (method === 'GET' && parts[1] === 'customer' && parts[2] === 'history') {
+      const customerId = Number(parts[3]);
+      const list = load('redemptions', []).filter(r => Number(r.customerId) === customerId);
+      return respond(list);
+    }
+
+    if (method === 'GET' && parts[1] === 'customer' && parts[2] === 'unused') {
+      const customerId = Number(parts[3]);
+      const list = load('redemptions', []).filter(r => Number(r.customerId) === customerId && !r.bookingId);
+      return respond(list);
+    }
+
+    if (method === 'POST' && parts[1] === 'admin' && parts[2] === 'create') {
+      if (!body.rewardName || body.pointsRequired == null || body.discountAmount == null || body.stockQuantity == null) {
+        return fail('Reward name, points, discount amount and stock quantity are required');
+      }
+      if (rewards.some(r => r.rewardName === body.rewardName)) {
+        return fail('Reward name already exists!');
+      }
+
+      const rewardId = nextNumber(rewards, 'rewardId', 'id');
+      const item = {
+        rewardId,
+        rewardName: body.rewardName,
+        description: body.description || '',
+        pointsRequired: Number(body.pointsRequired),
+        discountAmount: Number(body.discountAmount),
+        stockQuantity: Number(body.stockQuantity),
+        isActive: body.isActive !== false
+      };
+      rewards.push(item);
+      save('rewardCatalog', rewards);
+      return respond(toBackendReward(item), 201);
+    }
+
+    const id = Number(parts[3]);
+    const index = rewards.findIndex(r => numId(r.rewardId || r.id) === id);
+
+    if (method === 'PUT' && parts[1] === 'admin' && parts[2] === 'update') {
+      if (index < 0) return fail('Reward not found with ID: ' + id);
+      if (rewards.some(r => r.rewardName === body.rewardName && numId(r.rewardId || r.id) !== id)) {
+        return fail('Reward name is already taken!');
+      }
+
+      rewards[index] = {
+        ...rewards[index],
+        rewardName: body.rewardName,
+        description: body.description || '',
+        pointsRequired: Number(body.pointsRequired),
+        discountAmount: Number(body.discountAmount),
+        stockQuantity: Number(body.stockQuantity),
+        isActive: body.isActive !== undefined ? body.isActive !== false : rewards[index].isActive !== false
+      };
+      save('rewardCatalog', rewards);
+      return respond(toBackendReward(rewards[index]));
+    }
+
+    if (method === 'DELETE' && parts[1] === 'admin' && parts[2] === 'delete') {
+      if (index < 0) return fail('Reward not found');
+      rewards[index] = { ...rewards[index], isActive: false };
+      save('rewardCatalog', rewards);
+      return respond('Deactivated reward item success.');
     }
 
     return null;
@@ -396,6 +677,9 @@
     const id = Number(parts[2]);
 
     if (method === 'GET' && parts.length === 2) return respond(services.map(toBackendWashService));
+    if (method === 'GET' && parts[2] === 'active') {
+      return respond(services.filter(s => s.active !== false && s.isActive !== false).map(toBackendWashService));
+    }
 
     if (method === 'POST') {
       const serviceId = nextNumber(services, 'serviceId', 'id');
@@ -466,9 +750,17 @@
 
   function handlePromotions(method, parts, body) {
     let promotions = load('promotions', MOCK_DATA.promotions);
+
+    if (method === 'GET' && parts[1] === 'active') {
+      return respond(promotions.filter(p => p.status === 'active').map(toBackendPromotion));
+    }
+
     const id = Number(parts[1]);
 
     if (method === 'GET' && parts.length === 1) return respond(promotions.map(toBackendPromotion));
+    if (method === 'GET' && parts[1] === 'active') {
+      return respond(promotions.filter(p => p.status !== 'inactive').map(toBackendPromotion));
+    }
 
     if (method === 'POST') {
       const promoId = nextNumber(promotions, 'promoId', 'id');
@@ -492,6 +784,12 @@
       promotions = promotions.filter(p => numId(p.id) !== id);
       save('promotions', promotions);
       return respond(`Promotion with ID ${id} has been deleted successfully!`);
+    }
+
+    return null;
+  }
+
+
     }
 
     return null;
@@ -568,6 +866,9 @@
     if (resource === 'admin' && parts[1] === 'wash-services') return handleWashServices(method, parts, body);
     if (resource === 'admin' && parts[1] === 'time-slots') return handleTimeSlots(method, parts, body);
     if (resource === 'promotions') return handlePromotions(method, parts, body);
+    if (resource === 'loyalty-tiers') return handleLoyaltyTiers(method, parts, body);
+    if (resource === 'rewards') return handleRewards(method, parts, body);
+    if (resource === 'v1' && parts[1] === 'bookings') return handleBookingsV1(method, parts.slice(2), searchParams, body);
     if (resource === 'bookings') return handleBookings(method, parts, body);
 
     return handleDemo(method, parts, body) || fail(`Mock API does not support ${method} ${pathname}`, 404);
@@ -617,16 +918,21 @@
       loginWithGoogle: (token) => request('/api/auth/google', { method: 'POST', body: { token } })
     },
     customers: {
+      getAll: () => request('/api/customers'),
       profile: (customerId) => request(`/api/customers/profile?customerId=${customerId}`)
     },
     vehicles: {
-      byCustomer: (customerId) => request(`/api/vehicles/customer?customerId=${customerId}`),
+      byCustomer: (customerId) => {
+        const id = customerId ?? (typeof getLoggedInCustomerId === 'function' ? getLoggedInCustomerId() : null);
+        return request(`/api/vehicles/customer?customerId=${id}`);
+      },
       create: (payload) => request('/api/vehicles', { method: 'POST', body: payload }),
       update: (id, payload) => request(`/api/vehicles/${id}`, { method: 'PUT', body: payload }),
       remove: (id) => request(`/api/vehicles/${id}`, { method: 'DELETE' })
     },
     washServices: {
       list: () => request('/api/admin/wash-services'),
+      active: () => request('/api/admin/wash-services/active'),
       create: (payload) => request('/api/admin/wash-services', { method: 'POST', body: payload }),
       update: (id, payload) => request(`/api/admin/wash-services/${id}`, { method: 'PUT', body: payload }),
       remove: (id) => request(`/api/admin/wash-services/${id}`, { method: 'DELETE' })
@@ -640,13 +946,35 @@
     },
     promotions: {
       list: () => request('/api/promotions'),
+      active: () => request('/api/promotions/active'),
       create: (payload) => request('/api/promotions', { method: 'POST', body: payload }),
       update: (id, payload) => request(`/api/promotions/${id}`, { method: 'PUT', body: payload }),
       remove: (id) => request(`/api/promotions/${id}`, { method: 'DELETE' })
     },
+    loyaltyTiers: {
+      list: () => request('/api/loyalty-tiers'),
+      listActive: () => request('/api/loyalty-tiers/active'),
+      create: (payload) => request('/api/loyalty-tiers', { method: 'POST', body: payload }),
+      update: (id, payload) => request(`/api/loyalty-tiers/${id}`, { method: 'PUT', body: payload }),
+      remove: (id) => request(`/api/loyalty-tiers/${id}`, { method: 'DELETE' })
+    },
+    rewards: {
+      getAll: () => request('/api/rewards/admin/all'),
+      catalog: () => request('/api/rewards/customer/catalog'),
+      history: (customerId) => request(`/api/rewards/customer/history/${customerId}`),
+      unused: (customerId) => request(`/api/rewards/customer/unused/${customerId}`),
+      redeem: (payload) => request('/api/rewards/customer/redeem', { method: 'POST', body: payload }),
+      create: (payload) => request('/api/rewards/admin/create', { method: 'POST', body: payload }),
+      update: (id, payload) => request(`/api/rewards/admin/update/${id}`, { method: 'PUT', body: payload }),
+      delete: (id) => request(`/api/rewards/admin/delete/${id}`, { method: 'DELETE' })
+    },
     bookings: {
-      list: () => request('/api/bookings'),
-      create: (payload) => request('/api/bookings', { method: 'POST', body: payload }),
+      list: () => request('/api/v1/bookings'),
+      availableSlots: (date, washServiceId) => request(`/api/v1/bookings/available-slots?date=${date}&washServiceId=${washServiceId}`),
+      create: (payload) => request('/api/v1/bookings', { method: 'POST', body: payload }),
+      confirmArrival: (id) => request(`/api/v1/bookings/${id}/confirm-arrival`, { method: 'PUT' }),
+      complete: (id) => request(`/api/v1/bookings/${id}/complete`, { method: 'PUT' }),
+      cancel: (id) => request(`/api/v1/bookings/${id}/cancel`, { method: 'PUT' }),
       updateStatus: (id, status) => request(`/api/bookings/${id}/status`, { method: 'PATCH', body: { status } })
     },
     staff: {

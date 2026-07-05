@@ -1,6 +1,10 @@
 /* AutoWash Pro - Booking */
-let selectedTimeSlot = null;
+let selectedSlotId = null;
 let selectedPromotionId = null;
+let bookingVehicles = [];
+let bookingServices = [];
+let activePromotions = [];
+let unusedVouchers = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.getElementById('bookingForm')) return;
@@ -8,19 +12,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initBookingPage() {
+  if (!requireAuth(['customer'])) return;
+
   const customer = getCurrentCustomer();
   const tier = getTierById(customer.tier);
-  const vehicles = getVehicles().filter(v => v.customerId === customer.id);
-  const services = getServices().filter(s => s.active);
-
-  const vehicleSelect = document.getElementById('bookingVehicle');
-  vehicles.forEach(v => {
-    const opt = document.createElement('option');
-    opt.value = v.id;
-    opt.textContent = `${v.licensePlate} - ${v.brand} (${v.vehicleType})`;
-    opt.dataset.type = v.vehicleType;
-    vehicleSelect.appendChild(opt);
-  });
 
   document.getElementById('bookingWindowInfo').innerHTML =
     `<strong>Cửa sổ đặt lịch (${tier.name}):</strong> Bạn có thể đặt trước tối đa <strong>${tier.bookingWindow} ngày</strong>.`;
@@ -33,138 +28,214 @@ function initBookingPage() {
   dateInput.max = maxDate.toISOString().split('T')[0];
   dateInput.value = today.toISOString().split('T')[0];
 
-  renderTimeSlots();
-  updateServiceOptions();
-  renderPromotions(customer);
-  updatePriceSummary();
+  Promise.all([
+    fetchCustomerVehicles(getLoggedInCustomerId()),
+    fetchActiveWashServices().catch(() => getServices().map(normalizeWashService)),
+    fetchActivePromotions().catch(() => getPromotions().filter(p => p.status === 'active').map(normalizePromotion)),
+    fetchUnusedVouchers(getLoggedInCustomerId()).catch(() => [])
+  ])
+    .then(([vehicles, services, promotions, vouchers]) => {
+      bookingVehicles = vehicles.filter(v => v.isActive !== false);
+      bookingServices = services;
+      activePromotions = promotions;
+      unusedVouchers = vouchers;
+      populateBookingVehicles(bookingVehicles);
+      updateServiceOptions();
+      renderPromotionOptions(customer);
+      renderVoucherOptions();
+      renderTimeSlots();
+      updatePriceSummary();
+    })
+    .catch(error => {
+      showToast(error.message || 'Không tải được dữ liệu đặt lịch.');
+    });
 
-  vehicleSelect.addEventListener('change', () => {
+  document.getElementById('bookingVehicle')?.addEventListener('change', () => {
     updateServiceOptions();
+    renderTimeSlots();
     updatePriceSummary();
   });
-  document.getElementById('bookingService').addEventListener('change', updatePriceSummary);
-  document.getElementById('bookingDate').addEventListener('change', renderTimeSlots);
+  document.getElementById('bookingService')?.addEventListener('change', () => {
+    renderTimeSlots();
+    updatePriceSummary();
+  });
+  document.getElementById('bookingDate')?.addEventListener('change', renderTimeSlots);
   document.getElementById('bookingPromotion')?.addEventListener('change', (e) => {
     selectedPromotionId = e.target.value || null;
     updatePriceSummary();
   });
+  document.getElementById('bookingVouchers')?.addEventListener('change', updatePriceSummary);
+  document.getElementById('bookingForm')?.addEventListener('submit', confirmBooking);
+}
 
-  document.getElementById('bookingForm').addEventListener('submit', confirmBooking);
+function populateBookingVehicles(vehicles) {
+  const vehicleSelect = document.getElementById('bookingVehicle');
+  vehicleSelect.innerHTML = '<option value="">-- Chọn xe --</option>';
+  vehicles.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.vehicleId;
+    opt.textContent = `${v.licensePlate} - ${v.brand} (${v.vehicleType})`;
+    opt.dataset.type = v.vehicleType;
+    vehicleSelect.appendChild(opt);
+  });
 }
 
 function updateServiceOptions() {
-  const vehicleSelect = document.getElementById('bookingVehicle');
   const serviceSelect = document.getElementById('bookingService');
-  const vehicleType = vehicleSelect.selectedOptions[0]?.dataset.type;
   serviceSelect.innerHTML = '<option value="">-- Chọn dịch vụ --</option>';
-  getServices().filter(s => s.active && s.vehicleType === vehicleType).forEach(s => {
+  bookingServices.filter(s => s.isActive !== false).forEach(s => {
     const opt = document.createElement('option');
-    opt.value = s.id;
-    opt.textContent = `${s.name} - ${formatCurrency(s.price)} (${s.duration} phút)`;
-    opt.dataset.price = s.price;
+    opt.value = s.serviceId;
+    opt.textContent = `${s.serviceName} - ${formatCurrency(s.price)}`;
     serviceSelect.appendChild(opt);
   });
 }
 
-function renderTimeSlots() {
-  const container = document.getElementById('timeSlots');
-  if (!container) return;
-  container.innerHTML = '';
-  selectedTimeSlot = null;
-  MOCK_DATA.timeSlots.forEach(slot => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'time-slot';
-    btn.textContent = slot;
-    btn.addEventListener('click', () => {
-      container.querySelectorAll('.time-slot').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      selectedTimeSlot = slot;
-    });
-    container.appendChild(btn);
+function renderPromotionOptions(customer) {
+  const customerTierId = tierKeyToId(customer.tier);
+  const promos = activePromotions.filter(p => {
+    if (p.isActive === false) return false;
+    if (p.minTierId == null) return true;
+    return Number(p.minTierId) === customerTierId;
   });
-}
-
-function renderPromotions(customer) {
   const select = document.getElementById('bookingPromotion');
   if (!select) return;
-  const promos = getPromotions().filter(p => {
-    if (p.status !== 'active') return false;
-    if (p.targetTier === 'all') return true;
-    const tierOrder = ['member', 'silver', 'gold', 'platinum'];
-    return tierOrder.indexOf(customer.tier) >= tierOrder.indexOf(p.targetTier);
-  });
-  promos.forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    const disc = p.discountType === 'percent' ? `${p.discountValue}%` : formatCurrency(p.discountValue);
-    opt.textContent = `${p.name} (-${disc})`;
-    select.appendChild(opt);
-  });
+  select.innerHTML = '<option value="">Không áp dụng</option>' +
+    promos.map(p => `<option value="${p.promoId}">${p.promoName} (-${formatCurrency(p.discountAmount)})</option>`).join('');
+}
+
+function renderVoucherOptions() {
+  const select = document.getElementById('bookingVouchers');
+  if (!select) return;
+  if (!unusedVouchers.length) {
+    select.innerHTML = '<option value="">Không có voucher</option>';
+    return;
+  }
+  select.innerHTML = unusedVouchers.map(v =>
+    `<option value="${v.redemptionId}">${v.rewardName} (-${formatCurrency(v.discountAmount)})</option>`
+  ).join('');
+}
+
+function renderTimeSlots() {
+  const container = document.getElementById('timeSlots');
+  const serviceId = document.getElementById('bookingService').value;
+  const date = document.getElementById('bookingDate').value;
+  selectedSlotId = null;
+
+  if (!serviceId || !date) {
+    container.innerHTML = '<p class="text-muted">Chọn dịch vụ và ngày để xem khung giờ.</p>';
+    return;
+  }
+
+  container.innerHTML = '<p class="text-muted">Đang tải khung giờ...</p>';
+
+  fetchAvailableSlots(date, serviceId)
+    .then(slots => {
+      if (!slots.length) {
+        container.innerHTML = '<p class="text-muted">Không có khung giờ trống.</p>';
+        return;
+      }
+      container.innerHTML = slots.map(slot => {
+        const start = String(slot.startTime || '').slice(0, 5);
+        const end = String(slot.endTime || '').slice(0, 5);
+        const disabled = slot.isAvailable === false ? 'disabled' : '';
+        return `<button type="button" class="time-slot" data-slot-id="${slot.slotId}" ${disabled}
+          onclick="selectTimeSlot(${slot.slotId}, this)">${start} - ${end}</button>`;
+      }).join('');
+    })
+    .catch(error => {
+      container.innerHTML = '<p class="text-muted">Không tải được khung giờ.</p>';
+      showToast(error.message || 'Không tải được khung giờ.');
+    });
+}
+
+function selectTimeSlot(slotId, btn) {
+  if (btn.disabled) return;
+  selectedSlotId = slotId;
+  document.querySelectorAll('.time-slot').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
 }
 
 function updatePriceSummary() {
   const customer = getCurrentCustomer();
   const tier = getTierById(customer.tier);
-  const serviceOpt = document.getElementById('bookingService').selectedOptions[0];
-  const basePrice = parseFloat(serviceOpt?.dataset.price) || 0;
-  let discount = basePrice * (tier.discountPercent / 100);
-  let promoDiscount = 0;
+  const serviceId = document.getElementById('bookingService').value;
+  const service = bookingServices.find(s => String(s.serviceId) === String(serviceId));
+  const basePrice = service ? Number(service.price) : 0;
+  const discount = Math.round(basePrice * (tier.discountPercent || 0) / 100);
 
+  let promoDiscount = 0;
   if (selectedPromotionId) {
-    const promo = getPromotions().find(p => p.id === selectedPromotionId);
+    const promo = activePromotions.find(p => String(p.promoId) === String(selectedPromotionId));
     if (promo) {
-      promoDiscount = promo.discountType === 'percent'
-        ? (basePrice - discount) * (promo.discountValue / 100)
-        : promo.discountValue;
+      promoDiscount = Number(promo.discountAmount) <= 100
+        ? Math.round(basePrice * Number(promo.discountAmount) / 100)
+        : Number(promo.discountAmount);
     }
   }
 
-  const total = Math.max(0, basePrice - discount - promoDiscount);
-  const points = Math.round(total / 1000 * tier.pointRate);
+  let voucherDiscount = 0;
+  const voucherSelect = document.getElementById('bookingVouchers');
+  const voucherId = voucherSelect?.value;
+  if (voucherId) {
+    const voucher = unusedVouchers.find(v => String(v.redemptionId) === String(voucherId));
+    if (voucher) {
+      voucherDiscount = Number(voucher.discountAmount) <= 100
+        ? Math.round(basePrice * Number(voucher.discountAmount) / 100)
+        : Number(voucher.discountAmount);
+    }
+  }
+
+  const total = Math.max(0, basePrice - discount - promoDiscount - voucherDiscount);
+  const points = Math.round(total / 1000 * (tier.pointRate || 1));
 
   document.getElementById('summaryBase').textContent = formatCurrency(basePrice);
   document.getElementById('summaryTierDiscount').textContent = `-${formatCurrency(discount)}`;
   document.getElementById('summaryPromoDiscount').textContent = `-${formatCurrency(promoDiscount)}`;
+  document.getElementById('summaryVoucherDiscount').textContent = `-${formatCurrency(voucherDiscount)}`;
   document.getElementById('summaryTotal').textContent = formatCurrency(total);
-  document.getElementById('summaryPoints').textContent = `+${points} điểm`;
+  document.getElementById('summaryPoints').textContent = `+${points} điểm (dự kiến)`;
 }
 
-function confirmBooking(e) {
+async function confirmBooking(e) {
   e.preventDefault();
-  const customer = getCurrentCustomer();
+
+  if (!getAuthorizedUser(['customer'])) {
+    showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    return;
+  }
+
+  const customerId = getLoggedInCustomerId();
   const vehicleId = document.getElementById('bookingVehicle').value;
   const serviceId = document.getElementById('bookingService').value;
   const date = document.getElementById('bookingDate').value;
+  const voucherId = document.getElementById('bookingVouchers')?.value;
 
-  if (!vehicleId || !serviceId || !date || !selectedTimeSlot) {
+  if (!vehicleId || !serviceId || !date || !selectedSlotId) {
     showToast('Vui lòng chọn đầy đủ thông tin và khung giờ.');
     return;
   }
 
-  const vehicle = getVehicles().find(v => v.id === vehicleId);
-  const service = getServices().find(s => s.id === serviceId);
-  const totalText = document.getElementById('summaryTotal').textContent;
-  const bookings = getBookings();
-  const newId = `BK-2026-${String(bookings.length + 1).padStart(3, '0')}`;
+  const payload = {
+    customerId: Number(customerId),
+    vehicleId: Number(vehicleId),
+    slotId: Number(selectedSlotId),
+    washServiceId: Number(serviceId),
+    bookingDate: date,
+    promotionId: selectedPromotionId ? Number(selectedPromotionId) : null,
+    appliedRedemptionIds: voucherId ? [Number(voucherId)] : []
+  };
 
-  bookings.unshift({
-    id: newId,
-    customerId: customer.id,
-    customerName: customer.name,
-    vehicleId,
-    vehiclePlate: vehicle.licensePlate,
-    serviceId,
-    serviceName: service.name,
-    date,
-    time: selectedTimeSlot,
-    status: 'pending',
-    totalPrice: parseInt(totalText.replace(/\D/g, '')) || service.price,
-    pointsEarned: 0,
-    promotionId: selectedPromotionId
-  });
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.disabled = true;
 
-  saveToStorage('bookings', bookings);
-  showToast(`Đặt lịch thành công! Mã booking: ${newId}`);
-  setTimeout(() => { window.location.href = 'booking-history.html'; }, 1500);
+  try {
+    const result = await createBookingRequest(payload);
+    const paid = Number(result.finalPrice ?? result.totalPrice ?? 0);
+    showToast(`Đặt lịch thành công! Tổng thanh toán: ${formatCurrency(paid)}`);
+    setTimeout(() => { window.location.href = 'booking-history.html'; }, 1500);
+  } catch (error) {
+    showToast(error.message || 'Đặt lịch thất bại.');
+    if (submitBtn) submitBtn.disabled = false;
+  }
 }

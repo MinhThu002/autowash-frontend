@@ -16,12 +16,18 @@ document.addEventListener('DOMContentLoaded', () => {
     'admin-time-slots': renderAdminTimeSlots,
     'admin-loyalty-tiers': renderAdminTiers,
     'admin-promotions': renderAdminPromotions,
+    'admin-rewards': renderAdminRewards,
     'admin-analytics': renderAdminAnalytics,
     'staff-schedule': renderStaffSchedule
   };
 
   const fn = renderers[page];
-  if (fn) fn();
+  if (fn) {
+    Promise.resolve(fn()).catch(err => {
+      console.error(err);
+      showToast(err.message || 'Không tải được trang.');
+    });
+  }
 
   setupTableFiltersForPage(page);
   initCrudModals(page);
@@ -36,18 +42,35 @@ function setupTableFiltersForPage(page) {
   if (configs[page]) setupTableFilters(configs[page]);
 }
 
-function renderCustomerDashboard() {
-  const customer = getCurrentCustomer();
-  const tier = getTierById(customer.tier);
-  const nextTierIdx = MOCK_DATA.loyaltyTiers.findIndex(t => t.id === customer.tier) + 1;
+async function renderCustomerDashboard() {
+  const user = requireAuth(['customer']);
+  if (!user) return;
+
+  let customer = getCurrentCustomer();
+
+  if (window.AutoWashAPI && user.customerId) {
+    try {
+      customer = await fetchCustomerProfile(user.customerId);
+      mergeProfileIntoSession(customer);
+    } catch (error) {
+      console.warn('Không tải được profile khách hàng:', error);
+    }
+  }
+
+  paintCustomerDashboard(customer);
+}
+
+function paintCustomerDashboard(customer) {
+  const tier = getTierById(customer.tier || 'member');
+  const nextTierIdx = MOCK_DATA.loyaltyTiers.findIndex(t => t.id === (customer.tier || 'member')) + 1;
   const nextTier = MOCK_DATA.loyaltyTiers[nextTierIdx];
 
   setUserNav(customer);
-  document.getElementById('welcomeName').textContent = customer.name;
+  document.getElementById('welcomeName').textContent = customer.name || 'Khách hàng';
   document.getElementById('currentTier').textContent = tier.name;
-  document.getElementById('pointsBalance').textContent = customer.points.toLocaleString('vi-VN');
-  document.getElementById('totalVisits').textContent = customer.totalVisits;
-  document.getElementById('totalSpending').textContent = formatCurrency(customer.totalSpending);
+  document.getElementById('pointsBalance').textContent = Number(customer.points || 0).toLocaleString('vi-VN');
+  document.getElementById('totalVisits').textContent = Number(customer.totalVisits || 0);
+  document.getElementById('totalSpending').textContent = formatCurrency(Number(customer.totalSpending || 0));
 
   if (nextTier) {
     const visitProgress = Math.min(100, (customer.totalVisits / nextTier.requiredVisits) * 100);
@@ -62,7 +85,7 @@ function renderCustomerDashboard() {
     document.getElementById('tierProgressText').textContent = 'Bạn đã ở hạng cao nhất!';
   }
 
-  const bookings = getBookings().filter(b => b.customerId === customer.id);
+  const bookings = getBookings().filter(b => String(b.customerId) === String(customer.id) || String(b.customerId) === String(customer.customerId));
   const upcoming = bookings.find(b => ['pending', 'confirmed'].includes(b.status) && b.date >= new Date().toISOString().split('T')[0]);
   const upcomingEl = document.getElementById('upcomingBooking');
   if (upcoming) {
@@ -85,77 +108,119 @@ function renderCustomerDashboard() {
 }
 
 function renderVehiclesPage() {
+  const user = requireAuth(['customer']);
+  if (!user) return;
+
   const customer = getCurrentCustomer();
   setUserNav(customer);
   const list = document.getElementById('vehiclesList');
-  const vehicles = getVehicles().filter(v => v.customerId === customer.id);
+  const customerId = getLoggedInCustomerId();
 
-  if (!vehicles.length) {
-    list.innerHTML = '<div class="empty-state"><div class="icon">🚗</div><p>Chưa có xe nào. Thêm xe để đặt lịch.</p></div>';
-    return;
-  }
+  list.innerHTML = '<div class="empty-state"><p>Đang tải danh sách xe...</p></div>';
 
-  list.innerHTML = vehicles.map(v => `
-    <div class="vehicle-card" data-id="${v.id}">
-      <div class="vehicle-card-info">
-        <h4>${v.licensePlate}</h4>
-        <p>${v.brand} • ${v.vehicleType} • ${v.color}</p>
-        ${v.notes ? `<p class="text-muted">${v.notes}</p>` : ''}
-      </div>
-      <div class="actions">
-        <button class="btn btn-sm btn-secondary" onclick="editVehicle('${v.id}')">Sửa</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteVehicle('${v.id}')">Xóa</button>
-      </div>
-    </div>`).join('');
+  return fetchCustomerVehicles(customerId)
+    .then(vehicles => {
+      if (!vehicles.length) {
+        list.innerHTML = '<div class="empty-state"><div class="icon">🚗</div><p>Chưa có xe nào. Thêm xe để đặt lịch.</p></div>';
+        return;
+      }
+
+      list.innerHTML = vehicles.map(v => `
+        <div class="vehicle-card" data-id="${v.vehicleId}">
+          <div class="vehicle-card-info">
+            <h4>${v.licensePlate}</h4>
+            <p>${v.brand} • ${v.vehicleType} • ${v.color}</p>
+            ${v.notes ? `<p class="text-muted">${v.notes}</p>` : ''}
+          </div>
+          <div class="actions">
+            <button class="btn btn-sm btn-secondary" onclick="editVehicle(${v.vehicleId})">Sửa</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteVehicle(${v.vehicleId})">Xóa</button>
+          </div>
+        </div>`).join('');
+    })
+    .catch(error => {
+      list.innerHTML = '<div class="empty-state"><p>Không tải được danh sách xe.</p></div>';
+      showToast(error.message || 'Không tải được danh sách xe.');
+    });
 }
 
-function saveVehicle(e) {
+async function saveVehicle(e) {
   e.preventDefault();
-  const customer = getCurrentCustomer();
-  const id = document.getElementById('vehicleId').value;
-  const data = {
-    id: id || 'veh-' + Date.now(),
-    customerId: customer.id,
+  const user = requireAuth(['customer']);
+  if (!user) return;
+
+  const customerId = getLoggedInCustomerId();
+  const vehicleId = document.getElementById('vehicleId').value;
+  const payload = buildVehicleRequest(customerId, {
     licensePlate: document.getElementById('vehiclePlate').value.trim(),
     vehicleType: document.getElementById('vehicleType').value,
     brand: document.getElementById('vehicleBrand').value.trim(),
-    color: document.getElementById('vehicleColor').value.trim(),
-    notes: document.getElementById('vehicleNotes').value.trim()
-  };
-  if (!data.licensePlate || !data.brand) {
+    color: document.getElementById('vehicleColor').value.trim()
+  });
+
+  if (!payload.licensePlate || !payload.brand) {
     showToast('Vui lòng nhập biển số và hãng xe.');
     return;
   }
-  let vehicles = getVehicles();
-  if (id) {
-    vehicles = vehicles.map(v => v.id === id ? { ...v, ...data } : v);
-  } else {
-    vehicles.push(data);
+
+  if (!window.AutoWashAPI) {
+    showToast('API chưa sẵn sàng.');
+    return;
   }
-  saveToStorage('vehicles', vehicles);
-  closeModal('vehicleModal');
-  showToast(id ? 'Cập nhật xe thành công!' : 'Thêm xe thành công!');
-  renderVehiclesPage();
+
+  try {
+    if (vehicleId) {
+      await window.AutoWashAPI.vehicles.update(Number(vehicleId), payload);
+    } else {
+      await window.AutoWashAPI.vehicles.create(payload);
+    }
+    closeModal('vehicleModal');
+    showToast(vehicleId ? 'Cập nhật xe thành công!' : 'Thêm xe thành công!');
+    await renderVehiclesPage();
+  } catch (error) {
+    showToast(error.message || 'Lưu xe thất bại.');
+  }
 }
 
-function editVehicle(id) {
-  const v = getVehicles().find(x => x.id === id);
-  if (!v) return;
+async function editVehicle(id) {
+  const user = requireAuth(['customer']);
+  if (!user) return;
+
+  let vehicle;
+  try {
+    const vehicles = await fetchCustomerVehicles(getLoggedInCustomerId());
+    vehicle = vehicles.find(x => Number(x.vehicleId) === Number(id));
+  } catch (error) {
+    showToast(error.message || 'Không tải được thông tin xe.');
+    return;
+  }
+
+  if (!vehicle) return;
   document.getElementById('vehicleModalTitle').textContent = 'Sửa xe';
-  document.getElementById('vehicleId').value = v.id;
-  document.getElementById('vehiclePlate').value = v.licensePlate;
-  document.getElementById('vehicleType').value = v.vehicleType;
-  document.getElementById('vehicleBrand').value = v.brand;
-  document.getElementById('vehicleColor').value = v.color;
-  document.getElementById('vehicleNotes').value = v.notes || '';
+  document.getElementById('vehicleId').value = vehicle.vehicleId;
+  document.getElementById('vehiclePlate').value = vehicle.licensePlate;
+  document.getElementById('vehicleType').value = vehicle.vehicleType;
+  document.getElementById('vehicleBrand').value = vehicle.brand;
+  document.getElementById('vehicleColor').value = vehicle.color;
+  document.getElementById('vehicleNotes').value = vehicle.notes || '';
   openModal('vehicleModal');
 }
 
-function deleteVehicle(id) {
+async function deleteVehicle(id) {
   if (!confirm('Bạn có chắc muốn xóa xe này?')) return;
-  saveToStorage('vehicles', getVehicles().filter(v => v.id !== id));
-  showToast('Đã xóa xe.');
-  renderVehiclesPage();
+
+  if (!window.AutoWashAPI) {
+    showToast('API chưa sẵn sàng.');
+    return;
+  }
+
+  try {
+    await window.AutoWashAPI.vehicles.remove(Number(id));
+    showToast('Đã xóa xe.');
+    await renderVehiclesPage();
+  } catch (error) {
+    showToast(error.message || 'Xóa xe thất bại.');
+  }
 }
 
 function openAddVehicle() {
@@ -169,25 +234,49 @@ function renderBookingHistory() {
   const customer = getCurrentCustomer();
   setUserNav(customer);
   const tbody = document.querySelector('#bookingsTable tbody');
-  getBookings().filter(b => b.customerId === customer.id).forEach(b => {
-    tbody.innerHTML += `<tr data-status="${b.status}" data-date="${b.date}">
-      <td><strong>${b.id}</strong></td>
-      <td>${formatDate(b.date)}</td>
-      <td>${b.time}</td>
-      <td>${b.vehiclePlate}</td>
-      <td>${b.serviceName}</td>
-      <td>${getStatusBadge(b.status)}</td>
-      <td>${formatCurrency(b.totalPrice)}</td>
-      <td>${b.pointsEarned || '-'}</td>
-    </tr>`;
-  });
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="8">Đang tải lịch sử đặt lịch...</td></tr>';
+
+  fetchCustomerBookings(getLoggedInCustomerId())
+    .then(bookings => {
+      if (!bookings.length) {
+        tbody.innerHTML = '<tr><td colspan="8">Chưa có booking nào.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = bookings.map(b => `
+        <tr data-status="${b.status}" data-date="${b.date}">
+          <td><strong>#${b.id}</strong></td>
+          <td>${formatDate(b.date)}</td>
+          <td>${b.time}</td>
+          <td>${b.vehiclePlate}</td>
+          <td>${b.serviceName}</td>
+          <td>${getStatusBadge(b.status)}</td>
+          <td>${formatCurrency(b.totalPrice)}</td>
+          <td>${b.pointsEarned || '-'}</td>
+        </tr>`).join('');
+
+      filterTable('bookingsTable', {
+        status: document.getElementById('filterStatus')?.value,
+        dateFrom: document.getElementById('filterDateFrom')?.value,
+        dateTo: document.getElementById('filterDateTo')?.value
+      });
+    })
+    .catch(error => {
+      tbody.innerHTML = '<tr><td colspan="8">Không tải được lịch sử đặt lịch.</td></tr>';
+      showToast(error.message || 'Không tải được lịch sử đặt lịch.');
+    });
 }
 
 function renderLoyaltyPage() {
+  const user = requireAuth(['customer']);
+  if (!user) return;
+
   const customer = getCurrentCustomer();
-  const tier = getTierById(customer.tier);
   setUserNav(customer);
 
+  const tier = getTierById(customer.tier);
   document.getElementById('loyaltyTierName').textContent = tier.name;
   document.getElementById('loyaltyPoints').textContent = customer.points.toLocaleString('vi-VN');
   document.querySelector('.current-tier-card')?.classList.add(customer.tier);
@@ -205,24 +294,74 @@ function renderLoyaltyPage() {
   }
 
   const txEl = document.querySelector('#pointsHistory tbody');
-  MOCK_DATA.loyaltyTransactions.filter(t => t.customerId === customer.id).forEach(t => {
-    const sign = t.points > 0 ? '+' : '';
-    txEl.innerHTML += `<tr><td>${formatDate(t.date)}</td><td>${t.description}</td><td><span class="${t.points > 0 ? 'text-primary' : 'text-muted'}">${sign}${t.points}</span></td></tr>`;
-  });
-
   const rewardsEl = document.getElementById('rewardsList');
-  MOCK_DATA.rewards.forEach(r => {
-    rewardsEl.innerHTML += `<div class="reward-item"><h4>${r.name}</h4><p class="text-muted">${r.description}</p><div class="points-cost">${r.pointsCost} điểm</div><button class="btn btn-sm btn-primary" onclick="redeemReward('${r.id}', ${r.pointsCost})">Đổi thưởng</button></div>`;
-  });
+  if (txEl) txEl.innerHTML = '<tr><td colspan="3">Đang tải...</td></tr>';
+  if (rewardsEl) rewardsEl.innerHTML = '<p class="text-muted">Đang tải quà tặng...</p>';
+
+  fetchCustomerProfile(getLoggedInCustomerId())
+    .then(profile => {
+      document.getElementById('loyaltyTierName').textContent = getTierById(profile.tier).name;
+      document.getElementById('loyaltyPoints').textContent = profile.points.toLocaleString('vi-VN');
+    })
+    .catch(() => {});
+
+  fetchRedemptionHistory(getLoggedInCustomerId())
+    .then(items => {
+      if (!txEl) return;
+      if (!items.length) {
+        txEl.innerHTML = '<tr><td colspan="3">Chưa có lịch sử đổi thưởng.</td></tr>';
+        return;
+      }
+      txEl.innerHTML = items.map(item => `
+        <tr>
+          <td>${item.redemptionDate ? new Date(item.redemptionDate).toLocaleDateString('vi-VN') : '-'}</td>
+          <td>${item.rewardName}</td>
+          <td>${getStatusBadge(item.status)} <span class="text-muted">(-${item.pointsUsed})</span></td>
+        </tr>`).join('');
+    })
+    .catch(() => {
+      if (txEl) txEl.innerHTML = '<tr><td colspan="3">Không tải được lịch sử điểm.</td></tr>';
+    });
+
+  fetchCustomerRewardCatalog()
+    .then(rewards => {
+      if (!rewardsEl) return;
+      if (!rewards.length) {
+        rewardsEl.innerHTML = '<p class="text-muted">Chưa có quà tặng khả dụng.</p>';
+        return;
+      }
+      rewardsEl.innerHTML = rewards.map(r => `
+        <div class="reward-item">
+          <h4>${r.rewardName}</h4>
+          <p class="text-muted">${r.description || 'Voucher giảm giá'}</p>
+          <div class="points-cost">${r.pointsRequired.toLocaleString('vi-VN')} điểm</div>
+          <p class="text-muted" style="font-size:0.8125rem">Giảm ${formatCurrency(r.discountAmount)} • Còn ${r.stockQuantity}</p>
+          <button class="btn btn-sm btn-primary" onclick="redeemReward(${r.rewardId}, ${r.pointsRequired})">Đổi thưởng</button>
+        </div>`).join('');
+    })
+    .catch(error => {
+      if (rewardsEl) rewardsEl.innerHTML = '<p class="text-muted">Không tải được danh sách quà tặng.</p>';
+      showToast(error.message || 'Không tải được danh sách quà tặng.');
+    });
 }
 
-function redeemReward(id, cost) {
+async function redeemReward(rewardId, cost) {
+  const customerId = getLoggedInCustomerId();
   const customer = getCurrentCustomer();
-  if (customer.points < cost) {
+  if (Number(customer.points) < Number(cost)) {
     showToast('Không đủ điểm để đổi thưởng.');
     return;
   }
-  showToast('Đổi thưởng thành công! Voucher đã được thêm vào tài khoản.');
+  if (!confirm('Xác nhận đổi thưởng này?')) return;
+
+  try {
+    const result = await redeemCustomerReward(customerId, rewardId, 1);
+    mergeProfileIntoSession(await fetchCustomerProfile(customerId).catch(() => null));
+    showToast(`Đổi thưởng thành công! Voucher: ${result.rewardName || 'quà tặng'}`);
+    setTimeout(() => location.reload(), 1200);
+  } catch (error) {
+    showToast(error.message || 'Đổi thưởng thất bại.');
+  }
 }
 
 function renderPromotionsPage() {
@@ -231,7 +370,7 @@ function renderPromotionsPage() {
   const grid = document.getElementById('promotionsGrid');
   getPromotions().filter(p => p.status === 'active').forEach(p => {
     const disc = p.discountType === 'percent' ? `${p.discountValue}%` : formatCurrency(p.discountValue);
-    const tierLabel = p.targetTier === 'all' ? 'Tất cả hạng' : getTierById(p.targetTier).name;
+    const tierLabel = getDbTierName(getPromotionMinTierId(p));
     grid.innerHTML += `
       <div class="promotion-card">
         <h4>${p.name}</h4>
@@ -271,90 +410,225 @@ function renderAdminDashboard() {
 }
 
 function renderAdminCustomers() {
+  if (!requireAuth(['admin'])) return;
+
   const tbody = document.querySelector('#customersTable tbody');
-  MOCK_DATA.customers.forEach(c => {
-    tbody.innerHTML += `<tr data-tier="${c.tier}">
-      <td><strong>${c.name}</strong></td><td>${c.phone}</td><td>${c.email}</td>
-      <td>${getTierBadge(c.tier)}</td><td>${c.points}</td><td>${c.totalVisits}</td>
-      <td>${formatCurrency(c.totalSpending)}</td><td>${getStatusBadge(c.status)}</td></tr>`;
-  });
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="7">Đang tải danh sách khách hàng...</td></tr>';
+
+  fetchAdminCustomers()
+    .then(customers => {
+      if (!customers.length) {
+        tbody.innerHTML = '<tr><td colspan="7">Chưa có khách hàng.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = customers.map(c => {
+        const tierKey = normalizeTierKey(c.loyaltyTier);
+        const searchText = `${c.fullName} ${c.phoneNumber} ${c.email}`.toLowerCase();
+        return `<tr data-tier="${tierKey}" data-search="${searchText}">
+          <td><strong>${c.fullName}</strong></td>
+          <td>${c.phoneNumber}</td>
+          <td>${c.email}</td>
+          <td>${getTierBadgeFromLoyaltyTier(c.loyaltyTier)}</td>
+          <td>${c.currentPoints.toLocaleString('vi-VN')}</td>
+          <td>${c.totalVisits}</td>
+          <td>${formatCurrency(c.totalSpend)}</td>
+        </tr>`;
+      }).join('');
+
+      filterTable('customersTable', {
+        tier: document.getElementById('filterTier')?.value,
+        search: document.getElementById('searchCustomer')?.value
+      });
+    })
+    .catch(error => {
+      tbody.innerHTML = '<tr><td colspan="7">Không tải được danh sách khách hàng.</td></tr>';
+      showToast(error.message || 'Không tải được danh sách khách hàng.');
+    });
 }
 
 function renderAdminBookings() {
+  if (!requireAuth(['admin', 'staff'])) return;
+
   const tbody = document.querySelector('#adminBookingsTable tbody');
-  getBookings().forEach(b => {
-    tbody.innerHTML += `<tr data-status="${b.status}" data-id="${b.id}">
-      <td>${b.customerName}</td><td>${b.vehiclePlate}</td><td>${b.serviceName}</td>
-      <td>${formatDate(b.date)}</td><td>${b.time}</td><td>${getStatusBadge(b.status)}</td>
-      <td>${formatCurrency(b.totalPrice)}</td>
-      <td class="actions">
-        <button class="btn btn-sm btn-secondary" onclick="updateBookingStatus('${b.id}','confirmed')">Xác nhận</button>
-        <button class="btn btn-sm btn-primary" onclick="updateBookingStatus('${b.id}','in_progress')">Đang rửa</button>
-        <button class="btn btn-sm btn-primary" onclick="updateBookingStatus('${b.id}','completed')">Hoàn thành</button>
-        <button class="btn btn-sm btn-danger" onclick="updateBookingStatus('${b.id}','cancelled')">Hủy</button>
-      </td></tr>`;
-  });
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="8">Đang tải danh sách booking...</td></tr>';
+
+  fetchBookings()
+    .then(bookings => {
+      if (!bookings.length) {
+        tbody.innerHTML = '<tr><td colspan="8">Chưa có booking nào.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = bookings.map(b => {
+        const actions = [];
+        if (b.status === 'pending') {
+          actions.push(`<button class="btn btn-sm btn-secondary" onclick="confirmBookingAction(${b.id})">Xác nhận</button>`);
+          actions.push(`<button class="btn btn-sm btn-danger" onclick="cancelBookingAction(${b.id})">Hủy</button>`);
+        }
+        if (b.status === 'confirmed') {
+          actions.push(`<button class="btn btn-sm btn-primary" onclick="completeBookingAction(${b.id})">Hoàn thành</button>`);
+          actions.push(`<button class="btn btn-sm btn-danger" onclick="cancelBookingAction(${b.id})">Hủy</button>`);
+        }
+        if (!actions.length) actions.push('<span class="text-muted">—</span>');
+
+        return `<tr data-status="${b.status}" data-id="${b.id}">
+          <td>${b.customerName}</td><td>${b.vehiclePlate}</td><td>${b.serviceName}</td>
+          <td>${formatDate(b.date)}</td><td>${b.time}</td><td>${getStatusBadge(b.status)}</td>
+          <td>${formatCurrency(b.totalPrice)}</td>
+          <td class="actions">${actions.join(' ')}</td>
+        </tr>`;
+      }).join('');
+
+      filterTable('adminBookingsTable', {
+        status: document.getElementById('filterStatus')?.value
+      });
+    })
+    .catch(error => {
+      tbody.innerHTML = '<tr><td colspan="8">Không tải được danh sách booking.</td></tr>';
+      showToast(error.message || 'Không tải được danh sách booking.');
+    });
 }
 
-function updateBookingStatus(id, status) {
-  const bookings = getBookings().map(b => b.id === id ? { ...b, status } : b);
-  saveToStorage('bookings', bookings);
-  showToast('Cập nhật trạng thái thành công!');
-  location.reload();
-}
-
-function renderAdminServices() {
-  requireAuth(['admin']);
-  
-  // Initialize wash services module (handles form, modal, etc)
-  if (typeof initWashServices === 'function') {
-    initWashServices();
+async function confirmBookingAction(bookingId) {
+  if (!confirm('Xác nhận khách đã đến tiệm?')) return;
+  if (!getAuthorizedUser(['admin', 'staff'])) {
+    showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    return;
   }
-  
-  // Load services from backend
-  if (typeof loadWashServices === 'function') {
-    loadWashServices();
+  try {
+    await confirmBookingArrival(bookingId);
+    showToast('Đã xác nhận booking.');
+    renderAdminBookings();
+  } catch (error) {
+    showToast(error.message || 'Xác nhận booking thất bại.');
   }
 }
 
-function renderAdminTimeSlots() {
-  requireAuth(['admin']);
-  
-  // Initialize time slots module (handles form, modal, etc)
-  if (typeof initTimeSlots === 'function') {
-    initTimeSlots();
+async function completeBookingAction(bookingId) {
+  if (!confirm('Hoàn thành booking và tích điểm cho khách?')) return;
+  if (!getAuthorizedUser(['admin', 'staff'])) {
+    showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    return;
   }
-  
-  // Load time slots from backend
-  if (typeof loadTimeSlots === 'function') {
-    loadTimeSlots();
+  try {
+    await completeBooking(bookingId);
+    showToast('Booking đã hoàn thành.');
+    renderAdminBookings();
+  } catch (error) {
+    showToast(error.message || 'Hoàn thành booking thất bại.');
   }
+}
+
+async function cancelBookingAction(bookingId) {
+  if (!confirm('Hủy booking này?')) return;
+  if (!getAuthorizedUser(['admin', 'staff'])) {
+    showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    return;
+  }
+  try {
+    await cancelBookingRequest(bookingId);
+    showToast('Đã hủy booking.');
+    renderAdminBookings();
+  } catch (error) {
+    showToast(error.message || 'Hủy booking thất bại.');
+  }
+}
+
 }
 
 function renderAdminTiers() {
   const tbody = document.querySelector('#tiersTable tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
   MOCK_DATA.loyaltyTiers.forEach(t => {
-    tbody.innerHTML += `<tr>
-      <td><strong>${t.name}</strong></td><td>${t.requiredVisits}</td><td>${formatCurrency(t.requiredSpending)}</td>
-      <td>x${t.pointRate}</td><td>${t.bookingWindow} ngày</td><td>${t.discountPercent}%</td>
-      <td>${t.benefits.join(', ')}</td></tr>`;
+    const activeStatus = t.isActive ?? t.active ?? true;
+    tbody.innerHTML += `<tr data-id="${t.id || t.tierId}">
+      <td><strong>${t.name || t.tierName}</strong></td>
+      <td>${formatCurrency(t.minSpending ?? t.requiredSpending ?? 0)}</td>
+      <td>${t.minVisits ?? t.requiredVisits ?? 0} lượt</td>
+      <td>x${t.pointMultiplier ?? t.pointRate ?? 1}</td>
+      <td>${t.bookingWindowDays ?? t.bookingWindow ?? 7} ngày</td>
+      <td>${t.discountPercent}%</td>
+      <td>${t.priorityLevel ?? 1}</td>
+      <td>${getStatusBadge(activeStatus ? 'active' : 'inactive')}</td>
+      <td class="actions">
+        <button class="btn btn-sm btn-secondary" onclick="editLoyaltyTier('${t.id || t.tierId}')">Sửa</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteLoyaltyTier('${t.id || t.tierId}')">Xóa</button>
+      </td></tr>`;
   });
 }
 
 function renderAdminPromotions() {
+  populatePromotionTierSelect(document.getElementById('promoTier'));
+
   const tbody = document.querySelector('#promotionsTable tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const select = document.getElementById('promoTier');
+  if (select) {
+    select.innerHTML = '';
+    MOCK_DATA.loyaltyTiers.forEach(t => {
+      const activeStatus = t.isActive ?? t.active ?? true;
+      if (activeStatus) {
+        select.innerHTML += `<option value="${t.id || t.tierId}">${t.name || t.tierName}+</option>`;
+      }
+    });
+  }
+
   getPromotions().forEach(p => {
     const disc = p.discountType === 'percent' ? `${p.discountValue}%` : formatCurrency(p.discountValue);
+    const tierName = p.targetTier === 'all' || !p.targetTier ? 'Tất cả' : (getTierById(p.targetTier)?.name || 'Tất cả');
     tbody.innerHTML += `<tr data-id="${p.id}">
       <td><strong>${p.name}</strong></td><td>${p.description}</td><td>${disc}</td>
       <td>${formatDate(p.startDate)}</td><td>${formatDate(p.endDate)}</td>
-      <td>${p.targetTier === 'all' ? 'Tất cả' : getTierById(p.targetTier).name}</td>
-      <td>${p.usedCount}/${p.usageLimit}</td><td>${getStatusBadge(p.status)}</td>
+
       <td class="actions">
         <button class="btn btn-sm btn-secondary" onclick="editPromotion('${p.id}')">Sửa</button>
         <button class="btn btn-sm btn-danger" onclick="deletePromotion('${p.id}')">Xóa</button>
       </td></tr>`;
   });
+}
+
+function renderAdminRewards() {
+  if (!requireAuth(['admin'])) return;
+
+  const tbody = document.querySelector('#rewardsTable tbody');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="8">Đang tải danh sách quà tặng...</td></tr>';
+
+  fetchAdminRewards()
+    .then(rewards => {
+      if (!rewards.length) {
+        tbody.innerHTML = '<tr><td colspan="8">Chưa có quà tặng nào.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rewards.map(r => `
+        <tr data-id="${r.rewardId}">
+          <td>${r.rewardId}</td>
+          <td><strong>${r.rewardName}</strong></td>
+          <td>${r.description || '-'}</td>
+          <td>${r.pointsRequired.toLocaleString('vi-VN')}</td>
+          <td>${formatCurrency(r.discountAmount)}</td>
+          <td>${r.stockQuantity}</td>
+          <td>${getStatusBadge(r.isActive ? 'active' : 'inactive')}</td>
+          <td class="actions">
+            <button class="btn btn-sm btn-secondary" onclick="editReward(${r.rewardId})">Sửa</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteReward(${r.rewardId})">Xóa</button>
+          </td>
+        </tr>`).join('');
+    })
+    .catch(error => {
+      tbody.innerHTML = '<tr><td colspan="8">Không tải được danh sách quà tặng.</td></tr>';
+      showToast(error.message || 'Không tải được danh sách quà tặng.');
+    });
 }
 
 function renderAdminAnalytics() {
@@ -405,12 +679,12 @@ function updateScheduleStatus(id, status) {
 }
 
 function setUserNav(customer) {
-  const user = requireAuth(['customer']);
-  if (!user) return;
-  const name = customer?.name || user.name;
+  const user = getLoggedInUser();
+  if (!user || mapBackendRole(user.role) !== 'customer') return;
+  const name = customer?.name || user.name || 'Khách hàng';
   document.querySelectorAll('.user-name').forEach(el => el.textContent = name);
   document.querySelectorAll('.user-tier').forEach(el => {
-    if (customer) el.textContent = getTierById(customer.tier).name;
+    if (customer) el.textContent = getTierById(customer.tier || 'member').name;
   });
   document.querySelectorAll('.user-avatar').forEach(el => el.textContent = getUserInitials(name));
 }
@@ -446,45 +720,112 @@ function initCrudModals(page) {
   document.getElementById('vehicleForm')?.addEventListener('submit', saveVehicle);
   document.getElementById('serviceForm')?.addEventListener('submit', saveService);
   document.getElementById('promotionForm')?.addEventListener('submit', savePromotion);
+  document.getElementById('tierForm')?.addEventListener('submit', saveLoyaltyTier);
+  document.getElementById('rewardForm')?.addEventListener('submit', saveReward);
 }
 
-function saveService(e) {
+async function saveService(e) {
   e.preventDefault();
   const id = document.getElementById('serviceId').value;
+  const nameVal = document.getElementById('serviceName').value;
+  const durationVal = parseInt(document.getElementById('serviceDuration').value) || 0;
+  const priceVal = parseInt(document.getElementById('servicePrice').value) || 0;
+  const descVal = document.getElementById('serviceDescription').value;
+  const activeVal = document.getElementById('serviceActive').value === 'true';
+
   const data = {
-    id: id || 'svc-' + Date.now(),
-    name: document.getElementById('serviceName').value,
-    vehicleType: document.getElementById('serviceVehicleType').value,
-    duration: parseInt(document.getElementById('serviceDuration').value),
-    price: parseInt(document.getElementById('servicePrice').value),
-    description: document.getElementById('serviceDescription').value,
-    active: document.getElementById('serviceActive').value === 'true'
+    serviceName: nameVal,
+    durationMinutes: durationVal,
+    price: priceVal,
+    description: descVal,
+    isActive: activeVal,
+    // fallback for local storage / mock
+    name: nameVal,
+    duration: durationVal,
+    active: activeVal
   };
+
+  // Frontend Name Conflict Check
+  const nameConflict = adminServicesCache.find(s => 
+    (s.name === nameVal || s.serviceName === nameVal) && String(s.id || s.serviceId) !== String(id)
+  );
+  if (nameConflict) {
+    alert("Tên dịch vụ '" + nameVal + "' đã tồn tại. Vui lòng chọn tên khác!");
+    return;
+  }
+
+  try {
+    if (window.AutoWashAPI && window.AutoWashAPI.washServices) {
+      if (id) {
+        await window.AutoWashAPI.washServices.update(id, data);
+      } else {
+        await window.AutoWashAPI.washServices.create(data);
+      }
+      showToast('Lưu dịch vụ thành công!');
+      closeModal('serviceModal');
+      await renderAdminServices();
+      return;
+    }
+  } catch (err) {
+    console.warn('Backend API error, using fallback', err);
+    let errorMsg = err.message || 'Lỗi không xác định';
+    
+    // Translate the backend's raw English duplicate error into Vietnamese
+    if (errorMsg.includes('already exists')) {
+      errorMsg = "Tên dịch vụ này đã tồn tại trên hệ thống. Vui lòng chọn tên khác!";
+    }
+
+    if (errorMsg.includes('Failed to fetch')) {
+        // fallback
+    } else {
+        alert('Không thể lưu lên server:\\n' + errorMsg);
+        return;
+    }
+  }
+
+  // Fallback local storage
+  const svcId = id || 'svc-' + Date.now();
+  data.id = svcId;
   let services = getServices();
   services = id ? services.map(s => s.id === id ? { ...s, ...data } : s) : [...services, data];
   saveToStorage('services', services);
   closeModal('serviceModal');
   showToast('Lưu dịch vụ thành công!');
-  location.reload();
+  renderAdminServices();
 }
 
 function editService(id) {
-  const s = getServices().find(x => x.id === id);
+  const s = adminServicesCache.find(x => String(x.id || x.serviceId) === String(id));
   if (!s) return;
-  document.getElementById('serviceId').value = s.id;
-  document.getElementById('serviceName').value = s.name;
-  document.getElementById('serviceVehicleType').value = s.vehicleType;
-  document.getElementById('serviceDuration').value = s.duration;
-  document.getElementById('servicePrice').value = s.price;
-  document.getElementById('serviceDescription').value = s.description;
-  document.getElementById('serviceActive').value = s.active ? 'true' : 'false';
+  document.getElementById('serviceId').value = s.id || s.serviceId;
+  document.getElementById('serviceName').value = s.name || s.serviceName || '';
+  document.getElementById('serviceDuration').value = s.duration || s.durationMinutes || 0;
+  document.getElementById('servicePrice').value = s.price || 0;
+  document.getElementById('serviceDescription').value = s.description || '';
+  const activeStatus = s.active !== undefined ? s.active : (s.isActive !== undefined ? s.isActive : true);
+  document.getElementById('serviceActive').value = activeStatus ? 'true' : 'false';
   openModal('serviceModal');
 }
 
-function deleteService(id) {
+async function deleteService(id) {
   if (!confirm('Xóa dịch vụ này?')) return;
-  saveToStorage('services', getServices().filter(s => s.id !== id));
-  location.reload();
+  
+  try {
+    if (window.AutoWashAPI && window.AutoWashAPI.washServices) {
+      await window.AutoWashAPI.washServices.remove(id);
+      showToast('Xóa dịch vụ thành công!');
+      await renderAdminServices();
+      return;
+    }
+  } catch (err) {
+    console.warn('Delete failed', err);
+    alert('Không thể xóa: ' + (err.message || ''));
+    return;
+  }
+  
+  saveToStorage('services', getServices().filter(s => String(s.id) !== String(id)));
+  showToast('Đã xóa dịch vụ!');
+  renderAdminServices();
 }
 
 function openAddService() {
@@ -493,24 +834,76 @@ function openAddService() {
   openModal('serviceModal');
 }
 
-function savePromotion(e) {
+/* --- AUTOWASH API INTEGRATION: SAVE PROMOTION --- */
+async function savePromotion(e) {
   e.preventDefault();
   const id = document.getElementById('promoId').value;
+  const tierValue = document.getElementById('promoTier').value;
+  const minTierId = tierValue === '' ? null : Number(tierValue);
   const data = {
-    id: id || 'promo-' + Date.now(),
     name: document.getElementById('promoName').value,
     description: document.getElementById('promoDescription').value,
     discountType: document.getElementById('promoDiscountType').value,
     discountValue: parseFloat(document.getElementById('promoDiscountValue').value),
     startDate: document.getElementById('promoStart').value,
     endDate: document.getElementById('promoEnd').value,
-    targetTier: document.getElementById('promoTier').value,
-    usageLimit: parseInt(document.getElementById('promoLimit').value),
-    usedCount: 0,
+
     status: document.getElementById('promoStatus').value
   };
+
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  if (data.startDate < todayStr) {
+    data.startDate = todayStr;
+    const startInput = document.getElementById('promoStart');
+    if (startInput) startInput.value = todayStr;
+  }
+
+  if (data.endDate < data.startDate) {
+    alert('Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu!');
+    return;
+  }
+
+  try {
+    const url = id ? `/api/promotions/${id}` : `/api/promotions`;
+    const method = id ? 'PUT' : 'POST';
+    const backendData = typeof mapFrontendPromoToBackend === 'function' ? mapFrontendPromoToBackend(data) : data;
+    
+    const res = await fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(backendData)
+    });
+    
+    if (!res.ok) {
+      let errorMsg = 'Lỗi lưu thông tin lên database.';
+      try {
+        const errData = await res.json();
+        if (errData.message) errorMsg = errData.message;
+        else if (errData.error) errorMsg = errData.error;
+        if (errData.errors && Array.isArray(errData.errors)) {
+          errorMsg += ': ' + errData.errors.map(e => e.defaultMessage || e.message).join(', ');
+        }
+      } catch (e) {
+        try {
+          const text = await res.text();
+          if (text) errorMsg = text;
+        } catch (any) {}
+      }
+      throw new Error(errorMsg);
+    }
+  } catch (err) {
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      console.warn('Backend API offline, using localStorage fallback', err);
+    } else {
+      alert('Không thể lưu vào database:\n' + err.message);
+      return;
+    }
+  }
+
   let promos = getPromotions();
-  promos = id ? promos.map(p => p.id === id ? { ...p, ...data } : p) : [...promos, data];
+  const savedPromo = { ...data, id: id || 'promo-' + Date.now(), usedCount: 0 };
+  promos = id ? promos.map(p => p.id === id ? { ...p, ...data } : p) : [...promos, savedPromo];
   saveToStorage('promotions', promos);
   closeModal('promotionModal');
   showToast('Lưu khuyến mãi thành công!');
@@ -527,20 +920,142 @@ function editPromotion(id) {
   document.getElementById('promoDiscountValue').value = p.discountValue;
   document.getElementById('promoStart').value = p.startDate;
   document.getElementById('promoEnd').value = p.endDate;
-  document.getElementById('promoTier').value = p.targetTier;
-  document.getElementById('promoLimit').value = p.usageLimit;
+
   document.getElementById('promoStatus').value = p.status;
   openModal('promotionModal');
 }
 
-function deletePromotion(id) {
+/* --- AUTOWASH API INTEGRATION: DELETE PROMOTION --- */
+async function deletePromotion(id) {
   if (!confirm('Xóa khuyến mãi?')) return;
-  saveToStorage('promotions', getPromotions().filter(p => p.id !== id));
+
+  try {
+    const res = await fetch(`/api/promotions/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      let errorMsg = 'Lỗi xóa thông tin từ database.';
+      try {
+        const errData = await res.json();
+        if (errData.message) errorMsg = errData.message;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+  } catch (err) {
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      console.warn('Backend API offline, using localStorage fallback', err);
+    } else {
+      alert('Không thể xóa khỏi database:\n' + err.message);
+      return;
+    }
+  }
+
+  const updatedPromos = getPromotions().map(p => p.id === id ? { ...p, status: 'inactive' } : p);
+  saveToStorage('promotions', updatedPromos);
   location.reload();
 }
 
 function openAddPromotion() {
   document.getElementById('promotionForm').reset();
   document.getElementById('promoId').value = '';
+  populatePromotionTierSelect(document.getElementById('promoTier'));
   openModal('promotionModal');
+}
+
+async function saveReward(e) {
+  e.preventDefault();
+  if (!getAuthorizedUser(['admin'])) {
+    showToast('Bạn cần đăng nhập admin để lưu quà tặng.');
+    return;
+  }
+
+  const rewardId = document.getElementById('rewardId').value;
+  const payload = buildRewardRequest({
+    rewardName: document.getElementById('rewardName').value.trim(),
+    description: document.getElementById('rewardDescription').value.trim(),
+    pointsRequired: document.getElementById('rewardPoints').value,
+    discountAmount: document.getElementById('rewardDiscount').value,
+    stockQuantity: document.getElementById('rewardStock').value,
+    isActive: document.getElementById('rewardActive').value
+  });
+
+  if (!payload.rewardName || payload.pointsRequired < 1) {
+    showToast('Vui lòng nhập tên quà và điểm đổi hợp lệ.');
+    return;
+  }
+
+  if (!window.AutoWashAPI) {
+    showToast('API chưa sẵn sàng.');
+    return;
+  }
+
+  try {
+    if (rewardId) {
+      await window.AutoWashAPI.rewards.update(Number(rewardId), payload);
+    } else {
+      await window.AutoWashAPI.rewards.create(payload);
+    }
+    closeModal('rewardModal');
+    showToast(rewardId ? 'Cập nhật quà tặng thành công!' : 'Thêm quà tặng thành công!');
+    await renderAdminRewards();
+  } catch (error) {
+    showToast(error.message || 'Lưu quà tặng thất bại.');
+  }
+}
+
+async function editReward(id) {
+  if (!getAuthorizedUser(['admin'])) {
+    showToast('Bạn cần đăng nhập admin.');
+    return;
+  }
+
+  let reward;
+  try {
+    const rewards = await fetchAdminRewards();
+    reward = rewards.find(r => Number(r.rewardId) === Number(id));
+  } catch (error) {
+    showToast(error.message || 'Không tải được thông tin quà tặng.');
+    return;
+  }
+
+  if (!reward) return;
+
+  document.getElementById('rewardModalTitle').textContent = 'Sửa quà tặng';
+  document.getElementById('rewardId').value = reward.rewardId;
+  document.getElementById('rewardName').value = reward.rewardName;
+  document.getElementById('rewardDescription').value = reward.description || '';
+  document.getElementById('rewardPoints').value = reward.pointsRequired;
+  document.getElementById('rewardDiscount').value = reward.discountAmount;
+  document.getElementById('rewardStock').value = reward.stockQuantity;
+  document.getElementById('rewardActive').value = reward.isActive ? 'true' : 'false';
+  openModal('rewardModal');
+}
+
+async function deleteReward(id) {
+  if (!getAuthorizedUser(['admin'])) {
+    showToast('Bạn cần đăng nhập admin.');
+    return;
+  }
+  if (!confirm('Bạn có chắc muốn vô hiệu hóa quà tặng này?')) return;
+
+  if (!window.AutoWashAPI) {
+    showToast('API chưa sẵn sàng.');
+    return;
+  }
+
+  try {
+    await window.AutoWashAPI.rewards.delete(Number(id));
+    showToast('Đã vô hiệu hóa quà tặng.');
+    await renderAdminRewards();
+  } catch (error) {
+    showToast(error.message || 'Xóa quà tặng thất bại.');
+  }
+}
+
+function openAddReward() {
+  document.getElementById('rewardForm').reset();
+  document.getElementById('rewardId').value = '';
+  document.getElementById('rewardModalTitle').textContent = 'Thêm quà tặng';
+  document.getElementById('rewardActive').value = 'true';
+  openModal('rewardModal');
 }

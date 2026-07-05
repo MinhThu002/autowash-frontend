@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'admin-customers': renderAdminCustomers,
     'admin-bookings': renderAdminBookings,
     'admin-services': renderAdminServices,
+    'admin-time-slots': renderAdminTimeSlots,
     'admin-loyalty-tiers': renderAdminTiers,
     'admin-promotions': renderAdminPromotions,
     'admin-rewards': renderAdminRewards,
@@ -538,44 +539,6 @@ async function cancelBookingAction(bookingId) {
   }
 }
 
-let adminServicesCache = [];
-
-async function renderAdminServices() {
-  const tbody = document.querySelector('#servicesTable tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="6" class="text-center">Đang tải...</td></tr>';
-  
-  try {
-    if (window.AutoWashAPI && window.AutoWashAPI.washServices) {
-      adminServicesCache = await window.AutoWashAPI.washServices.list();
-    } else {
-      adminServicesCache = getServices();
-    }
-  } catch (err) {
-    console.warn('Fallback to local storage', err);
-    adminServicesCache = getServices();
-  }
-  
-  tbody.innerHTML = '';
-  if (!adminServicesCache || adminServicesCache.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Chưa có dịch vụ nào</td></tr>';
-    return;
-  }
-  
-  adminServicesCache.forEach(s => {
-    const id = s.id || s.serviceId || s.id;
-    const active = s.active !== undefined ? s.active : (s.isActive !== undefined ? s.isActive : true);
-    const name = s.name || s.serviceName || '';
-    const duration = s.duration || s.durationMinutes || 0;
-    tbody.innerHTML += `<tr data-id="${id}">
-      <td><strong>${name}</strong></td><td>${duration} phút</td>
-      <td>${formatCurrency(s.price || 0)}</td><td>${s.description || ''}</td>
-      <td>${getStatusBadge(active ? 'active' : 'inactive')}</td>
-      <td class="actions">
-        <button class="btn btn-sm btn-secondary" onclick="editService('${id}')">Sửa</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteService('${id}')">Xóa</button>
-      </td></tr>`;
-  });
 }
 
 function renderAdminTiers() {

@@ -143,7 +143,6 @@
     if (!localStorage.getItem('autowash_customers')) save('customers', MOCK_DATA.customers);
     if (!localStorage.getItem('autowash_loyaltyTransactions')) save('loyaltyTransactions', MOCK_DATA.loyaltyTransactions);
     if (!localStorage.getItem('autowash_staffSchedule')) save('staffSchedule', MOCK_DATA.staffSchedule);
-    if (!localStorage.getItem('autowash_services')) save('services', MOCK_DATA.services);
     if (!localStorage.getItem('autowash_timeSlots')) {
       save('timeSlots', MOCK_DATA.timeSlots.map((slot, index) => ({
         slotId: index + 1,
@@ -285,7 +284,7 @@
       startTime: slot.startTime,
       endTime: slot.endTime,
       maxCapacity: slot.maxCapacity,
-      isActive: (slot.isActive !== undefined) ? slot.isActive : (slot.isStatus ?? true)
+      isStatus: slot.isStatus ?? slot.isActive ?? true
     };
   }
 
@@ -594,8 +593,6 @@
     const id = Number(parts[2]);
 
     if (method === 'GET' && parts.length === 2) return respond(slots.map(toBackendTimeSlot));
-    
-    if (method === 'GET' && parts[2] === 'active') return respond(slots.filter(s => s.isActive).map(toBackendTimeSlot));
 
     if (method === 'POST') {
       const slot = {
@@ -847,7 +844,6 @@
     },
     timeSlots: {
       list: () => request('/api/admin/time-slots'),
-      getActive: () => request('/api/admin/time-slots/active'),
       create: (payload) => request('/api/admin/time-slots', { method: 'POST', body: payload }),
       update: (id, payload) => request(`/api/admin/time-slots/${id}`, { method: 'PUT', body: payload }),
       remove: (id) => request(`/api/admin/time-slots/${id}`, { method: 'DELETE' })

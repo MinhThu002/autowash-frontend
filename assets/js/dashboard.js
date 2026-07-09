@@ -375,92 +375,39 @@ function updateBookingStatus(id, status) {
   location.reload();
 }
 
-let adminServicesCache = [];
-
-async function renderAdminServices() {
+function renderAdminServices() {
   const tbody = document.querySelector('#servicesTable tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="6" class="text-center">Đang tải...</td></tr>';
-  
-  try {
-    if (window.AutoWashAPI && window.AutoWashAPI.washServices) {
-      adminServicesCache = await window.AutoWashAPI.washServices.list();
-    } else {
-      adminServicesCache = getServices();
-    }
-  } catch (err) {
-    console.warn('Fallback to local storage', err);
-    adminServicesCache = getServices();
-  }
-  
-  tbody.innerHTML = '';
-  if (!adminServicesCache || adminServicesCache.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Chưa có dịch vụ nào</td></tr>';
-    return;
-  }
-  
-  adminServicesCache.forEach(s => {
-    const id = s.id || s.serviceId || s.id;
-    const active = s.active !== undefined ? s.active : (s.isActive !== undefined ? s.isActive : true);
-    const name = s.name || s.serviceName || '';
-    const duration = s.duration || s.durationMinutes || 0;
-    tbody.innerHTML += `<tr data-id="${id}">
-      <td><strong>${name}</strong></td><td>${duration} phút</td>
-      <td>${formatCurrency(s.price || 0)}</td><td>${s.description || ''}</td>
-      <td>${getStatusBadge(active ? 'active' : 'inactive')}</td>
+  getServices().forEach(s => {
+    tbody.innerHTML += `<tr data-id="${s.id}">
+      <td><strong>${s.name}</strong></td><td>${s.vehicleType}</td><td>${s.duration} phút</td>
+      <td>${formatCurrency(s.price)}</td><td>${s.description}</td>
+      <td>${getStatusBadge(s.active ? 'active' : 'inactive')}</td>
       <td class="actions">
-        <button class="btn btn-sm btn-secondary" onclick="editService('${id}')">Sửa</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteService('${id}')">Xóa</button>
+        <button class="btn btn-sm btn-secondary" onclick="editService('${s.id}')">Sửa</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteService('${s.id}')">Xóa</button>
       </td></tr>`;
   });
 }
 
 function renderAdminTiers() {
   const tbody = document.querySelector('#tiersTable tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
   MOCK_DATA.loyaltyTiers.forEach(t => {
-    const activeStatus = t.isActive ?? t.active ?? true;
-    tbody.innerHTML += `<tr data-id="${t.id || t.tierId}">
-      <td><strong>${t.name || t.tierName}</strong></td>
-      <td>${formatCurrency(t.minSpending ?? t.requiredSpending ?? 0)}</td>
-      <td>${t.minVisits ?? t.requiredVisits ?? 0} lượt</td>
-      <td>x${t.pointMultiplier ?? t.pointRate ?? 1}</td>
-      <td>${t.bookingWindowDays ?? t.bookingWindow ?? 7} ngày</td>
-      <td>${t.discountPercent}%</td>
-      <td>${t.priorityLevel ?? 1}</td>
-      <td>${getStatusBadge(activeStatus ? 'active' : 'inactive')}</td>
-      <td class="actions">
-        <button class="btn btn-sm btn-secondary" onclick="editLoyaltyTier('${t.id || t.tierId}')">Sửa</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteLoyaltyTier('${t.id || t.tierId}')">Xóa</button>
-      </td></tr>`;
+    tbody.innerHTML += `<tr>
+      <td><strong>${t.name}</strong></td><td>${t.requiredVisits}</td><td>${formatCurrency(t.requiredSpending)}</td>
+      <td>x${t.pointRate}</td><td>${t.bookingWindow} ngày</td><td>${t.discountPercent}%</td>
+      <td>${t.benefits.join(', ')}</td></tr>`;
   });
 }
 
 function renderAdminPromotions() {
   const tbody = document.querySelector('#promotionsTable tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  const select = document.getElementById('promoTier');
-  if (select) {
-    select.innerHTML = '';
-    MOCK_DATA.loyaltyTiers.forEach(t => {
-      const activeStatus = t.isActive ?? t.active ?? true;
-      if (activeStatus) {
-        select.innerHTML += `<option value="${t.id || t.tierId}">${t.name || t.tierName}+</option>`;
-      }
-    });
-  }
-
   getPromotions().forEach(p => {
     const disc = p.discountType === 'percent' ? `${p.discountValue}%` : formatCurrency(p.discountValue);
-    const tierName = p.targetTier === 'all' || !p.targetTier ? 'Tất cả' : (getTierById(p.targetTier)?.name || 'Tất cả');
     tbody.innerHTML += `<tr data-id="${p.id}">
       <td><strong>${p.name}</strong></td><td>${p.description}</td><td>${disc}</td>
       <td>${formatDate(p.startDate)}</td><td>${formatDate(p.endDate)}</td>
-      <td>${tierName}</td>
-      <td>${getStatusBadge(p.status)}</td>
+      <td>${p.targetTier === 'all' ? 'Tất cả' : getTierById(p.targetTier).name}</td>
+      <td>${p.usedCount}/${p.usageLimit}</td><td>${getStatusBadge(p.status)}</td>
       <td class="actions">
         <button class="btn btn-sm btn-secondary" onclick="editPromotion('${p.id}')">Sửa</button>
         <button class="btn btn-sm btn-danger" onclick="deletePromotion('${p.id}')">Xóa</button>
@@ -594,112 +541,46 @@ function initCrudModals(page) {
   document.getElementById('vehicleForm')?.addEventListener('submit', saveVehicle);
   document.getElementById('serviceForm')?.addEventListener('submit', saveService);
   document.getElementById('promotionForm')?.addEventListener('submit', savePromotion);
-  document.getElementById('tierForm')?.addEventListener('submit', saveLoyaltyTier);
   document.getElementById('rewardForm')?.addEventListener('submit', saveReward);
 }
 
-async function saveService(e) {
+function saveService(e) {
   e.preventDefault();
   const id = document.getElementById('serviceId').value;
-  const nameVal = document.getElementById('serviceName').value;
-  const durationVal = parseInt(document.getElementById('serviceDuration').value) || 0;
-  const priceVal = parseInt(document.getElementById('servicePrice').value) || 0;
-  const descVal = document.getElementById('serviceDescription').value;
-  const activeVal = document.getElementById('serviceActive').value === 'true';
-
   const data = {
-    serviceName: nameVal,
-    durationMinutes: durationVal,
-    price: priceVal,
-    description: descVal,
-    isActive: activeVal,
-    // fallback for local storage / mock
-    name: nameVal,
-    duration: durationVal,
-    active: activeVal
+    id: id || 'svc-' + Date.now(),
+    name: document.getElementById('serviceName').value,
+    vehicleType: document.getElementById('serviceVehicleType').value,
+    duration: parseInt(document.getElementById('serviceDuration').value),
+    price: parseInt(document.getElementById('servicePrice').value),
+    description: document.getElementById('serviceDescription').value,
+    active: document.getElementById('serviceActive').value === 'true'
   };
-
-  // Frontend Name Conflict Check
-  const nameConflict = adminServicesCache.find(s => 
-    (s.name === nameVal || s.serviceName === nameVal) && String(s.id || s.serviceId) !== String(id)
-  );
-  if (nameConflict) {
-    alert("Tên dịch vụ '" + nameVal + "' đã tồn tại. Vui lòng chọn tên khác!");
-    return;
-  }
-
-  try {
-    if (window.AutoWashAPI && window.AutoWashAPI.washServices) {
-      if (id) {
-        await window.AutoWashAPI.washServices.update(id, data);
-      } else {
-        await window.AutoWashAPI.washServices.create(data);
-      }
-      showToast('Lưu dịch vụ thành công!');
-      closeModal('serviceModal');
-      await renderAdminServices();
-      return;
-    }
-  } catch (err) {
-    console.warn('Backend API error, using fallback', err);
-    let errorMsg = err.message || 'Lỗi không xác định';
-    
-    // Translate the backend's raw English duplicate error into Vietnamese
-    if (errorMsg.includes('already exists')) {
-      errorMsg = "Tên dịch vụ này đã tồn tại trên hệ thống. Vui lòng chọn tên khác!";
-    }
-
-    if (errorMsg.includes('Failed to fetch')) {
-        // fallback
-    } else {
-        alert('Không thể lưu lên server:\\n' + errorMsg);
-        return;
-    }
-  }
-
-  // Fallback local storage
-  const svcId = id || 'svc-' + Date.now();
-  data.id = svcId;
   let services = getServices();
   services = id ? services.map(s => s.id === id ? { ...s, ...data } : s) : [...services, data];
   saveToStorage('services', services);
   closeModal('serviceModal');
   showToast('Lưu dịch vụ thành công!');
-  renderAdminServices();
+  location.reload();
 }
 
 function editService(id) {
-  const s = adminServicesCache.find(x => String(x.id || x.serviceId) === String(id));
+  const s = getServices().find(x => x.id === id);
   if (!s) return;
-  document.getElementById('serviceId').value = s.id || s.serviceId;
-  document.getElementById('serviceName').value = s.name || s.serviceName || '';
-  document.getElementById('serviceDuration').value = s.duration || s.durationMinutes || 0;
-  document.getElementById('servicePrice').value = s.price || 0;
-  document.getElementById('serviceDescription').value = s.description || '';
-  const activeStatus = s.active !== undefined ? s.active : (s.isActive !== undefined ? s.isActive : true);
-  document.getElementById('serviceActive').value = activeStatus ? 'true' : 'false';
+  document.getElementById('serviceId').value = s.id;
+  document.getElementById('serviceName').value = s.name;
+  document.getElementById('serviceVehicleType').value = s.vehicleType;
+  document.getElementById('serviceDuration').value = s.duration;
+  document.getElementById('servicePrice').value = s.price;
+  document.getElementById('serviceDescription').value = s.description;
+  document.getElementById('serviceActive').value = s.active ? 'true' : 'false';
   openModal('serviceModal');
 }
 
-async function deleteService(id) {
+function deleteService(id) {
   if (!confirm('Xóa dịch vụ này?')) return;
-  
-  try {
-    if (window.AutoWashAPI && window.AutoWashAPI.washServices) {
-      await window.AutoWashAPI.washServices.remove(id);
-      showToast('Xóa dịch vụ thành công!');
-      await renderAdminServices();
-      return;
-    }
-  } catch (err) {
-    console.warn('Delete failed', err);
-    alert('Không thể xóa: ' + (err.message || ''));
-    return;
-  }
-  
-  saveToStorage('services', getServices().filter(s => String(s.id) !== String(id)));
-  showToast('Đã xóa dịch vụ!');
-  renderAdminServices();
+  saveToStorage('services', getServices().filter(s => s.id !== id));
+  location.reload();
 }
 
 function openAddService() {
@@ -708,11 +589,11 @@ function openAddService() {
   openModal('serviceModal');
 }
 
-/* --- AUTOWASH API INTEGRATION: SAVE PROMOTION --- */
-async function savePromotion(e) {
+function savePromotion(e) {
   e.preventDefault();
   const id = document.getElementById('promoId').value;
   const data = {
+    id: id || 'promo-' + Date.now(),
     name: document.getElementById('promoName').value,
     description: document.getElementById('promoDescription').value,
     discountType: document.getElementById('promoDiscountType').value,
@@ -720,63 +601,12 @@ async function savePromotion(e) {
     startDate: document.getElementById('promoStart').value,
     endDate: document.getElementById('promoEnd').value,
     targetTier: document.getElementById('promoTier').value,
-    usageLimit: 999,
+    usageLimit: parseInt(document.getElementById('promoLimit').value),
+    usedCount: 0,
     status: document.getElementById('promoStatus').value
   };
-
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  if (data.startDate < todayStr) {
-    data.startDate = todayStr;
-    const startInput = document.getElementById('promoStart');
-    if (startInput) startInput.value = todayStr;
-  }
-
-  if (data.endDate < data.startDate) {
-    alert('Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu!');
-    return;
-  }
-
-  try {
-    const url = id ? `/api/promotions/${id}` : `/api/promotions`;
-    const method = id ? 'PUT' : 'POST';
-    const backendData = typeof mapFrontendPromoToBackend === 'function' ? mapFrontendPromoToBackend(data) : data;
-    
-    const res = await fetch(url, {
-      method: method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(backendData)
-    });
-    
-    if (!res.ok) {
-      let errorMsg = 'Lỗi lưu thông tin lên database.';
-      try {
-        const errData = await res.json();
-        if (errData.message) errorMsg = errData.message;
-        else if (errData.error) errorMsg = errData.error;
-        if (errData.errors && Array.isArray(errData.errors)) {
-          errorMsg += ': ' + errData.errors.map(e => e.defaultMessage || e.message).join(', ');
-        }
-      } catch (e) {
-        try {
-          const text = await res.text();
-          if (text) errorMsg = text;
-        } catch (any) {}
-      }
-      throw new Error(errorMsg);
-    }
-  } catch (err) {
-    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
-      console.warn('Backend API offline, using localStorage fallback', err);
-    } else {
-      alert('Không thể lưu vào database:\n' + err.message);
-      return;
-    }
-  }
-
   let promos = getPromotions();
-  const savedPromo = { ...data, id: id || 'promo-' + Date.now(), usedCount: 0 };
-  promos = id ? promos.map(p => p.id === id ? { ...p, ...data } : p) : [...promos, savedPromo];
+  promos = id ? promos.map(p => p.id === id ? { ...p, ...data } : p) : [...promos, data];
   saveToStorage('promotions', promos);
   closeModal('promotionModal');
   showToast('Lưu khuyến mãi thành công!');
@@ -794,37 +624,14 @@ function editPromotion(id) {
   document.getElementById('promoStart').value = p.startDate;
   document.getElementById('promoEnd').value = p.endDate;
   document.getElementById('promoTier').value = p.targetTier;
+  document.getElementById('promoLimit').value = p.usageLimit;
   document.getElementById('promoStatus').value = p.status;
   openModal('promotionModal');
 }
 
-/* --- AUTOWASH API INTEGRATION: DELETE PROMOTION --- */
-async function deletePromotion(id) {
+function deletePromotion(id) {
   if (!confirm('Xóa khuyến mãi?')) return;
-
-  try {
-    const res = await fetch(`/api/promotions/${id}`, {
-      method: 'DELETE'
-    });
-    if (!res.ok) {
-      let errorMsg = 'Lỗi xóa thông tin từ database.';
-      try {
-        const errData = await res.json();
-        if (errData.message) errorMsg = errData.message;
-      } catch (e) {}
-      throw new Error(errorMsg);
-    }
-  } catch (err) {
-    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
-      console.warn('Backend API offline, using localStorage fallback', err);
-    } else {
-      alert('Không thể xóa khỏi database:\n' + err.message);
-      return;
-    }
-  }
-
-  const updatedPromos = getPromotions().map(p => p.id === id ? { ...p, status: 'inactive' } : p);
-  saveToStorage('promotions', updatedPromos);
+  saveToStorage('promotions', getPromotions().filter(p => p.id !== id));
   location.reload();
 }
 

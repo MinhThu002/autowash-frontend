@@ -215,11 +215,9 @@ function initStorage() {
     saveToStorage('bookings', MOCK_DATA.bookings);
     saveToStorage('services', MOCK_DATA.services);
     saveToStorage('promotions', MOCK_DATA.promotions);
-    saveToStorage('loyaltyTiers', MOCK_DATA.loyaltyTiers);
     saveToStorage('rewardCatalog', MOCK_DATA.rewardCatalog);
     localStorage.setItem('autowash_initialized', 'true');
   }
-  MOCK_DATA.loyaltyTiers = loadFromStorage('loyaltyTiers', MOCK_DATA.loyaltyTiers);
 }
 
 function getBookings() {

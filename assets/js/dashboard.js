@@ -45,6 +45,10 @@ async function renderCustomerDashboard() {
   const user = requireAuth(['customer']);
   if (!user) return;
 
+  if (typeof syncLoyaltyTiersFromServer === 'function') {
+    await syncLoyaltyTiersFromServer();
+  }
+
   let customer = getCurrentCustomer();
 
   if (window.AutoWashAPI && user.customerId) {
@@ -60,24 +64,26 @@ async function renderCustomerDashboard() {
 }
 
 function paintCustomerDashboard(customer) {
-  const tier = getTierById(customer.tier || 'member');
-  const nextTierIdx = MOCK_DATA.loyaltyTiers.findIndex(t => t.id === (customer.tier || 'member')) + 1;
-  const nextTier = MOCK_DATA.loyaltyTiers[nextTierIdx];
+  const tierRef = customer.loyaltyTier || customer.tierName || customer.tier || 'member';
+  const nextTier = getNextTier(tierRef);
 
   setUserNav(customer);
   document.getElementById('welcomeName').textContent = customer.name || 'Khách hàng';
-  document.getElementById('currentTier').textContent = tier.name;
+  document.getElementById('currentTier').textContent = getTierDisplayName(tierRef);
   document.getElementById('pointsBalance').textContent = Number(customer.points || 0).toLocaleString('vi-VN');
   document.getElementById('totalVisits').textContent = Number(customer.totalVisits || 0);
   document.getElementById('totalSpending').textContent = formatCurrency(Number(customer.totalSpending || 0));
 
   if (nextTier) {
-    const visitProgress = Math.min(100, (customer.totalVisits / nextTier.requiredVisits) * 100);
-    const spendProgress = Math.min(100, (customer.totalSpending / nextTier.requiredSpending) * 100);
+    const requiredVisits = Number(nextTier.minVisits ?? nextTier.requiredVisits ?? 1) || 1;
+    const requiredSpending = Number(nextTier.minSpending ?? nextTier.requiredSpending ?? 1) || 1;
+    const visitProgress = Math.min(100, (customer.totalVisits / requiredVisits) * 100);
+    const spendProgress = Math.min(100, (customer.totalSpending / requiredSpending) * 100);
     const progress = Math.round((visitProgress + spendProgress) / 2);
-    document.getElementById('nextTierName').textContent = nextTier.name;
+    const nextTierName = getTierDisplayName(nextTier);
+    document.getElementById('nextTierName').textContent = nextTierName;
     document.getElementById('tierProgressFill').style.width = progress + '%';
-    document.getElementById('tierProgressText').textContent = `${progress}% đến ${nextTier.name}`;
+    document.getElementById('tierProgressText').textContent = `${progress}% đến ${nextTierName}`;
   } else {
     document.getElementById('nextTierName').textContent = 'Tối đa';
     document.getElementById('tierProgressFill').style.width = '100%';
@@ -721,7 +727,7 @@ function setUserNav(customer) {
   const name = customer?.name || user.name || 'Khách hàng';
   document.querySelectorAll('.user-name').forEach(el => el.textContent = name);
   document.querySelectorAll('.user-tier').forEach(el => {
-    if (customer) el.textContent = getTierById(customer.tier || 'member').name;
+    if (customer) el.textContent = getTierDisplayName(customer.loyaltyTier || customer.tierName || customer.tier || 'member');
   });
   document.querySelectorAll('.user-avatar').forEach(el => el.textContent = getUserInitials(name));
 }

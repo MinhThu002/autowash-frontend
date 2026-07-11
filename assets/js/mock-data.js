@@ -113,8 +113,60 @@ const MOCK_DATA = {
   ]
 };
 
+function getLoyaltyTierList() {
+  try {
+    const cached = localStorage.getItem('autowash_loyaltyTiers');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    }
+  } catch (_) {}
+  return MOCK_DATA.loyaltyTiers;
+}
+
+function extractTierLabel(tier) {
+  if (tier == null) return '';
+  if (typeof tier === 'object') return String(tier.tierName || tier.name || '').trim();
+  return String(tier).trim();
+}
+
 function getTierById(tierId) {
-  return MOCK_DATA.loyaltyTiers.find(t => t.id === tierId) || MOCK_DATA.loyaltyTiers[0];
+  const list = getLoyaltyTierList();
+  const label = extractTierLabel(tierId);
+  const key = normalizeTierKey(label || tierId);
+  return list.find(t =>
+    String(t.id) === String(tierId) ||
+    String(t.tierId) === String(tierId) ||
+    normalizeTierKey(t.id) === key ||
+    normalizeTierKey(t.name || t.tierName) === key ||
+    String(t.name || t.tierName).toLowerCase() === label.toLowerCase()
+  ) || list[0];
+}
+
+function getTierDisplayName(tierRef) {
+  if (tierRef && typeof tierRef === 'object') {
+    const direct = tierRef.tierName || tierRef.name;
+    if (direct) return direct;
+  }
+  const tier = getTierById(tierRef);
+  return tier?.tierName || tier?.name || extractTierLabel(tierRef) || 'BRONZE';
+}
+
+function getSortedTiers() {
+  return [...getLoyaltyTierList()].sort((a, b) =>
+    (a.priorityLevel ?? 99) - (b.priorityLevel ?? 99) ||
+    Number(a.minSpending ?? a.requiredSpending ?? 0) - Number(b.minSpending ?? b.requiredSpending ?? 0)
+  );
+}
+
+function getNextTier(tierRef) {
+  const list = getSortedTiers();
+  const current = getTierById(tierRef);
+  const idx = list.findIndex(t =>
+    String(t.id || t.tierId) === String(current?.id || current?.tierId) ||
+    normalizeTierKey(t.name || t.tierName) === normalizeTierKey(current?.name || current?.tierName)
+  );
+  return idx >= 0 && idx < list.length - 1 ? list[idx + 1] : null;
 }
 
 function getDbTierById(tierId) {
@@ -235,13 +287,13 @@ function getStatusBadge(status) {
 }
 
 function getTierBadge(tierId) {
-  const tier = getTierById(tierId);
+  const key = normalizeTierKey(tierId);
   const colors = { member: '', silver: 'badge-silver', gold: 'badge-gold', platinum: 'badge-platinum' };
-  return `<span class="badge badge-tier ${colors[tierId] || ''}">${tier.name}</span>`;
+  return `<span class="badge badge-tier ${colors[key] || ''}">${getTierDisplayName(tierId)}</span>`;
 }
 
 function normalizeTierKey(tier) {
-  const value = String(tier || '').toLowerCase();
+  const value = extractTierLabel(tier).toLowerCase() || String(tier || '').toLowerCase();
   if (value.includes('bronze') || value === 'member') return 'member';
   if (value.includes('silver')) return 'silver';
   if (value.includes('gold')) return 'gold';
@@ -471,7 +523,8 @@ function normalizeRedemption(item) {
 }
 
 function normalizeCustomerProfile(profile) {
-  const tierName = profile.loyaltyTier?.tierName || profile.loyaltyTier || profile.currentTier || 'BRONZE';
+  const loyaltyTier = profile.loyaltyTier;
+  const tierName = loyaltyTier?.tierName || (typeof loyaltyTier === 'string' ? loyaltyTier : null) || profile.currentTier || 'BRONZE';
   return {
     id: profile.customerId ?? getLoggedInCustomerId(),
     customerId: profile.customerId ?? getLoggedInCustomerId(),
@@ -479,6 +532,8 @@ function normalizeCustomerProfile(profile) {
     email: profile.email || '',
     phone: profile.phoneNumber || profile.phone || '',
     tier: normalizeTierKey(tierName),
+    loyaltyTier: loyaltyTier || tierName,
+    tierName,
     points: Number(profile.currentPoints ?? profile.pointsBalance ?? 0),
     totalVisits: Number(profile.totalVisits ?? 0),
     totalSpending: Number(profile.totalSpend ?? profile.totalSpending ?? 0)

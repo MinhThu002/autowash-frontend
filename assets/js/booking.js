@@ -74,8 +74,8 @@ function populateBookingVehicles(vehicles) {
   vehicles.forEach(v => {
     const opt = document.createElement('option');
     opt.value = v.vehicleId;
-    opt.textContent = `${v.licensePlate} - ${v.brand} (${v.vehicleType})`;
-    opt.dataset.type = v.vehicleType;
+    opt.textContent = `${v.licensePlate} - ${v.brand} (${getVehicleTypeLabel(v.vehicleType)})`;
+    opt.dataset.type = normalizeVehicleType(v.vehicleType);
     vehicleSelect.appendChild(opt);
   });
 }
@@ -84,7 +84,8 @@ function getSelectedVehicleType() {
   const vehicleSelect = document.getElementById('bookingVehicle');
   if (!vehicleSelect?.value) return null;
   const vehicle = bookingVehicles.find(v => String(v.vehicleId) === String(vehicleSelect.value));
-  return vehicle?.vehicleType || vehicleSelect.selectedOptions[0]?.dataset.type || null;
+  const type = vehicle?.vehicleType || vehicleSelect.selectedOptions[0]?.dataset.type || null;
+  return type ? normalizeVehicleType(type) : null;
 }
 
 function getSelectedService() {
@@ -94,19 +95,7 @@ function getSelectedService() {
 }
 
 function getServicesForSelectedVehicle() {
-  const vehicleType = getSelectedVehicleType();
-  return bookingServices.filter(s => {
-    if (s.isActive === false) return false;
-    if (!bookingServicesUseVehicleType()) return true;
-    return serviceMatchesVehicleType(s, vehicleType);
-  });
-}
-
-function formatSlotStartTime(time) {
-  if (!time) return '--:--';
-  const text = String(time);
-  if (text.includes('T')) return text.split('T')[1].slice(0, 5);
-  return text.slice(0, 5);
+  return bookingServices.filter(s => s.isActive !== false);
 }
 
 function updateServiceOptions() {
@@ -123,7 +112,7 @@ function updateServiceOptions() {
   }
 
   if (!services.length) {
-    serviceSelect.innerHTML = '<option value="">-- Không có dịch vụ cho loại xe này --</option>';
+    serviceSelect.innerHTML = '<option value="">-- Không có dịch vụ --</option>';
     return;
   }
 
@@ -131,7 +120,8 @@ function updateServiceOptions() {
     const opt = document.createElement('option');
     opt.value = s.serviceId;
     const duration = s.durationMinutes ?? s.duration ?? 60;
-    opt.textContent = `${s.serviceName} - ${formatCurrency(s.price)} (${duration} phút)`;
+    const price = calculateBasePrice(s.price, vehicleType);
+    opt.textContent = `${s.serviceName} - ${formatCurrency(price)} (${duration} phút)`;
     serviceSelect.appendChild(opt);
   });
 
@@ -213,11 +203,19 @@ function selectTimeSlot(slotId, btn) {
   btn.classList.add('selected');
 }
 
+function formatSlotStartTime(time) {
+  if (!time) return '--:--';
+  const text = String(time);
+  if (text.includes('T')) return text.split('T')[1].slice(0, 5);
+  return text.slice(0, 5);
+}
+
 function updatePriceSummary() {
   const customer = getCurrentCustomer();
   const tier = getTierById(customer.loyaltyTier || customer.tierName || customer.tier);
   const service = getSelectedService();
-  const basePrice = service ? Number(service.price) : 0;
+  const vehicleType = getSelectedVehicleType();
+  const basePrice = service ? calculateBasePrice(service.price, vehicleType) : 0;
   const discount = Math.round(basePrice * (tier.discountPercent || 0) / 100);
 
   let promoDiscount = 0;

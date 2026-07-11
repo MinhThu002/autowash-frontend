@@ -134,7 +134,7 @@ function renderVehiclesPage() {
         <div class="vehicle-card" data-id="${v.vehicleId}">
           <div class="vehicle-card-info">
             <h4>${v.licensePlate}</h4>
-            <p>${v.brand} • ${v.vehicleType} • ${v.color}</p>
+            <p>${v.brand} • ${getVehicleTypeLabel(v.vehicleType)} • ${v.color}</p>
             ${v.notes ? `<p class="text-muted">${v.notes}</p>` : ''}
           </div>
           <div class="actions">
@@ -204,7 +204,7 @@ async function editVehicle(id) {
   document.getElementById('vehicleModalTitle').textContent = 'Sửa xe';
   document.getElementById('vehicleId').value = vehicle.vehicleId;
   document.getElementById('vehiclePlate').value = vehicle.licensePlate;
-  document.getElementById('vehicleType').value = vehicle.vehicleType;
+  document.getElementById('vehicleType').value = normalizeVehicleType(vehicle.vehicleType);
   document.getElementById('vehicleBrand').value = vehicle.brand;
   document.getElementById('vehicleColor').value = vehicle.color;
   document.getElementById('vehicleNotes').value = vehicle.notes || '';

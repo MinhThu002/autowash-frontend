@@ -25,19 +25,19 @@ const MOCK_DATA = {
   ],
 
   vehicles: [
-    { id: 'veh-001', vehicleId: 1, customerId: 'cust-001', licensePlate: '51A-12345', vehicleType: 'Car', brand: 'Toyota Camry', color: 'Trắng', notes: 'Xe gia đình', isActive: true },
-    { id: 'veh-002', vehicleId: 2, customerId: 'cust-001', licensePlate: '59-H1 6789', vehicleType: 'Motorbike', brand: 'Honda Vision', color: 'Đỏ', notes: '', isActive: true },
-    { id: 'veh-003', vehicleId: 3, customerId: 'cust-002', licensePlate: '30F-98765', vehicleType: 'Car', brand: 'Hyundai Tucson', color: 'Xám', notes: '', isActive: true }
+    { id: 'veh-001', vehicleId: 1, customerId: 'cust-001', licensePlate: '51A-12345', vehicleType: 'medium', brand: 'Toyota Camry', color: 'Trắng', notes: 'Xe gia đình', isActive: true },
+    { id: 'veh-002', vehicleId: 2, customerId: 'cust-001', licensePlate: '59-H1 6789', vehicleType: 'small', brand: 'Honda Vision', color: 'Đỏ', notes: '', isActive: true },
+    { id: 'veh-003', vehicleId: 3, customerId: 'cust-002', licensePlate: '30F-98765', vehicleType: 'large', brand: 'Hyundai Tucson', color: 'Xám', notes: '', isActive: true }
   ],
 
   services: [
-    { id: 'svc-001', name: 'Rửa nhanh', vehicleType: 'Motorbike', duration: 15, price: 50000, description: 'Rửa ngoài cơ bản', active: true },
-    { id: 'svc-002', name: 'Rửa tiêu chuẩn', vehicleType: 'Motorbike', duration: 25, price: 80000, description: 'Rửa ngoài + lau khô', active: true },
-    { id: 'svc-003', name: 'Rửa nhanh', vehicleType: 'Car', duration: 20, price: 120000, description: 'Rửa ngoài cơ bản', active: true },
-    { id: 'svc-004', name: 'Rửa tiêu chuẩn', vehicleType: 'Car', duration: 35, price: 180000, description: 'Rửa ngoài + hút bụi', active: true },
-    { id: 'svc-005', name: 'Rửa cao cấp', vehicleType: 'Car', duration: 60, price: 350000, description: 'Rửa full + wax', active: true },
-    { id: 'svc-006', name: 'Detailing', vehicleType: 'Car', duration: 120, price: 800000, description: 'Chăm sóc toàn diện', active: true },
-    { id: 'svc-007', name: 'Rửa cũ', vehicleType: 'Car', duration: 30, price: 100000, description: 'Ngừng dịch vụ', active: false }
+    { id: 'svc-001', name: 'Rửa nhanh', duration: 15, price: 50000, description: 'Rửa ngoài cơ bản', active: true },
+    { id: 'svc-002', name: 'Rửa tiêu chuẩn', duration: 25, price: 80000, description: 'Rửa ngoài + lau khô', active: true },
+    { id: 'svc-003', name: 'Rửa nhanh', duration: 20, price: 120000, description: 'Rửa ngoài cơ bản', active: true },
+    { id: 'svc-004', name: 'Rửa tiêu chuẩn', duration: 35, price: 180000, description: 'Rửa ngoài + hút bụi', active: true },
+    { id: 'svc-005', name: 'Rửa cao cấp', duration: 60, price: 350000, description: 'Rửa full + wax', active: true },
+    { id: 'svc-006', name: 'Detailing', duration: 120, price: 800000, description: 'Chăm sóc toàn diện', active: true },
+    { id: 'svc-007', name: 'Rửa cũ', duration: 30, price: 100000, description: 'Ngừng dịch vụ', active: false }
   ],
 
   bookings: [
@@ -388,7 +388,7 @@ function normalizeVehicle(vehicle) {
     vehicleId,
     customerId: vehicle.customerId,
     licensePlate: vehicle.licensePlate,
-    vehicleType: vehicle.vehicleType,
+    vehicleType: normalizeVehicleType(vehicle.vehicleType),
     brand: vehicle.brand || '',
     color: vehicle.color || '',
     notes: vehicle.notes || '',
@@ -471,38 +471,49 @@ function normalizeWashService(service) {
     serviceId: service.serviceId ?? numId(service.id),
     serviceName: service.serviceName || service.name || '',
     description: service.description || '',
-    vehicleType: service.vehicleType || inferServiceVehicleType(service.serviceName || service.name || ''),
     price: Number(service.price || 0),
     durationMinutes: Number(service.durationMinutes ?? service.duration ?? 30),
     isActive: service.isActive !== false && service.active !== false
   };
 }
 
-function inferServiceVehicleType(serviceName) {
-  const name = String(serviceName || '').toLowerCase();
-  if (/(motorbike|xe máy|xe may|moto)/i.test(name)) return 'Motorbike';
-  if (/(car|ô tô|oto|xe hơi)/i.test(name)) return 'Car';
-  return '';
-}
+const VEHICLE_TYPES = ['small', 'medium', 'large', 'extra'];
+
+const VEHICLE_TYPE_LABELS = {
+  small: 'Nhỏ (Small)',
+  medium: 'Vừa (Medium)',
+  large: 'Lớn (Large)',
+  extra: 'Rất lớn (Extra)'
+};
+
+const VEHICLE_TYPE_SURCHARGES = {
+  small: 0,
+  medium: 50000,
+  large: 100000,
+  extra: 150000
+};
 
 function normalizeVehicleType(type) {
   const value = String(type || '').trim().toLowerCase();
+  if (value === 'car' || value.includes('ô tô') || value.includes('oto')) return 'medium';
   if (value.includes('motor') || value.includes('moto') || value.includes('xe máy') || value.includes('xe may')) {
-    return 'motorbike';
+    return 'small';
   }
-  if (value.includes('car') || value.includes('oto') || value.includes('ô tô') || value.includes('xe hoi')) {
-    return 'car';
-  }
-  return value;
+  if (VEHICLE_TYPES.includes(value)) return value;
+  return 'medium';
 }
 
-function serviceMatchesVehicleType(service, vehicleType) {
-  if (!vehicleType || !service.vehicleType) return true;
-  return normalizeVehicleType(service.vehicleType) === normalizeVehicleType(vehicleType);
+function getVehicleTypeLabel(type) {
+  const key = normalizeVehicleType(type);
+  return VEHICLE_TYPE_LABELS[key] || key;
 }
 
-function bookingServicesUseVehicleType() {
-  return bookingServices.some(s => s.vehicleType);
+function getVehicleTypeSurcharge(type) {
+  return VEHICLE_TYPE_SURCHARGES[normalizeVehicleType(type)] ?? 0;
+}
+
+function calculateBasePrice(servicePrice, vehicleType) {
+  return Number(servicePrice || 0) + getVehicleTypeSurcharge(vehicleType);
 }
 
 function normalizePromotion(promo) {

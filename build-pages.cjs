@@ -146,7 +146,7 @@ pages['customer-vehicles.html'] = layout('Xe của tôi', customerSidebar('custo
       <div class="modal-body">
         <input type="hidden" id="vehicleId">
         <div class="form-group"><label>Biển số</label><input type="text" id="vehiclePlate" required></div>
-        <div class="form-group"><label>Loại xe</label><select id="vehicleType"><option value="Car">Ô tô</option><option value="Motorbike">Xe máy</option></select></div>
+        <div class="form-group"><label>Loại xe</label><select id="vehicleType"><option value="small">Nhỏ (Small)</option><option value="medium">Vừa (Medium)</option><option value="large">Lớn (Large)</option><option value="extra">Rất lớn (Extra)</option></select></div>
         <div class="form-group"><label>Hãng xe</label><input type="text" id="vehicleBrand" required></div>
         <div class="form-group"><label>Màu sắc</label><input type="text" id="vehicleColor"></div>
         <div class="form-group"><label>Ghi chú</label><textarea id="vehicleNotes"></textarea></div>

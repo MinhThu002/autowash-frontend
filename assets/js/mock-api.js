@@ -270,7 +270,6 @@
       ...(existing || {}),
       id: existing?.id || legacyId('svc', body.serviceId || Date.now()),
       name: body.serviceName,
-      vehicleType: body.vehicleType || existing?.vehicleType || 'Car',
       duration: Number(body.durationMinutes || body.duration || 30),
       price: Number(body.price || 0),
       description: body.description || '',

@@ -18,12 +18,12 @@ function initBookingPage() {
   const tier = getTierById(customer.tier);
 
   document.getElementById('bookingWindowInfo').innerHTML =
-    `<strong>Cửa sổ đặt lịch (${tier.name}):</strong> Bạn có thể đặt trước tối đa <strong>${tier.bookingWindow} ngày</strong>.`;
+    `<strong>Cửa sổ đặt lịch (${getTierDisplayName(customer.loyaltyTier || customer.tier)}):</strong> Bạn có thể đặt trước tối đa <strong>${tier.bookingWindowDays ?? tier.bookingWindow ?? 7} ngày</strong>.`;
 
   const dateInput = document.getElementById('bookingDate');
   const today = new Date();
   const maxDate = new Date();
-  maxDate.setDate(today.getDate() + tier.bookingWindow);
+  maxDate.setDate(today.getDate() + (tier.bookingWindowDays ?? tier.bookingWindow ?? 7));
   dateInput.min = today.toISOString().split('T')[0];
   dateInput.max = maxDate.toISOString().split('T')[0];
   dateInput.value = today.toISOString().split('T')[0];
@@ -80,15 +80,64 @@ function populateBookingVehicles(vehicles) {
   });
 }
 
+function getSelectedVehicleType() {
+  const vehicleSelect = document.getElementById('bookingVehicle');
+  if (!vehicleSelect?.value) return null;
+  const vehicle = bookingVehicles.find(v => String(v.vehicleId) === String(vehicleSelect.value));
+  return vehicle?.vehicleType || vehicleSelect.selectedOptions[0]?.dataset.type || null;
+}
+
+function getSelectedService() {
+  const serviceId = document.getElementById('bookingService')?.value;
+  if (!serviceId) return null;
+  return bookingServices.find(s => String(s.serviceId) === String(serviceId)) || null;
+}
+
+function getServicesForSelectedVehicle() {
+  const vehicleType = getSelectedVehicleType();
+  return bookingServices.filter(s => {
+    if (s.isActive === false) return false;
+    if (!bookingServicesUseVehicleType()) return true;
+    return serviceMatchesVehicleType(s, vehicleType);
+  });
+}
+
+function formatSlotStartTime(time) {
+  if (!time) return '--:--';
+  const text = String(time);
+  if (text.includes('T')) return text.split('T')[1].slice(0, 5);
+  return text.slice(0, 5);
+}
+
 function updateServiceOptions() {
   const serviceSelect = document.getElementById('bookingService');
+  const previous = serviceSelect.value;
+  const vehicleType = getSelectedVehicleType();
+  const services = getServicesForSelectedVehicle();
+
   serviceSelect.innerHTML = '<option value="">-- Chọn dịch vụ --</option>';
-  bookingServices.filter(s => s.isActive !== false).forEach(s => {
+
+  if (!vehicleType) {
+    serviceSelect.innerHTML = '<option value="">-- Chọn xe trước --</option>';
+    return;
+  }
+
+  if (!services.length) {
+    serviceSelect.innerHTML = '<option value="">-- Không có dịch vụ cho loại xe này --</option>';
+    return;
+  }
+
+  services.forEach(s => {
     const opt = document.createElement('option');
     opt.value = s.serviceId;
-    opt.textContent = `${s.serviceName} - ${formatCurrency(s.price)}`;
+    const duration = s.durationMinutes ?? s.duration ?? 60;
+    opt.textContent = `${s.serviceName} - ${formatCurrency(s.price)} (${duration} phút)`;
     serviceSelect.appendChild(opt);
   });
+
+  if (services.some(s => String(s.serviceId) === String(previous))) {
+    serviceSelect.value = previous;
+  }
 }
 
 function renderPromotionOptions(customer) {
@@ -135,12 +184,20 @@ function renderTimeSlots() {
         container.innerHTML = '<p class="text-muted">Không có khung giờ trống.</p>';
         return;
       }
-      container.innerHTML = slots.map(slot => {
-        const start = String(slot.startTime || '').slice(0, 5);
-        const end = String(slot.endTime || '').slice(0, 5);
+
+      const service = getSelectedService();
+      const duration = Number(service?.durationMinutes ?? service?.duration ?? 60);
+      const slotsNeeded = Math.max(1, Math.ceil(duration / 60));
+      const hint = slotsNeeded > 1
+        ? `<p class="form-hint">Dịch vụ ${duration} phút cần ${slotsNeeded} slot liên tiếp (mỗi slot 60 phút). Giờ hiển thị là <strong>giờ bắt đầu</strong> của slot bạn chọn.</p>`
+        : '<p class="form-hint">Mỗi khung giờ là 60 phút. Giờ hiển thị là giờ bắt đầu.</p>';
+
+      container.innerHTML = hint + slots.map(slot => {
+        const start = formatSlotStartTime(slot.startTime);
         const disabled = slot.isAvailable === false ? 'disabled' : '';
+        const label = slot.slotName ? `${start} (${slot.slotName})` : start;
         return `<button type="button" class="time-slot" data-slot-id="${slot.slotId}" ${disabled}
-          onclick="selectTimeSlot(${slot.slotId}, this)">${start} - ${end}</button>`;
+          onclick="selectTimeSlot(${slot.slotId}, this)">${label}</button>`;
       }).join('');
     })
     .catch(error => {
@@ -158,9 +215,8 @@ function selectTimeSlot(slotId, btn) {
 
 function updatePriceSummary() {
   const customer = getCurrentCustomer();
-  const tier = getTierById(customer.tier);
-  const serviceId = document.getElementById('bookingService').value;
-  const service = bookingServices.find(s => String(s.serviceId) === String(serviceId));
+  const tier = getTierById(customer.loyaltyTier || customer.tierName || customer.tier);
+  const service = getSelectedService();
   const basePrice = service ? Number(service.price) : 0;
   const discount = Math.round(basePrice * (tier.discountPercent || 0) / 100);
 
@@ -187,7 +243,7 @@ function updatePriceSummary() {
   }
 
   const total = Math.max(0, basePrice - discount - promoDiscount - voucherDiscount);
-  const points = Math.round(total / 1000 * (tier.pointRate || 1));
+  const points = Math.round(total / 1000 * (tier.pointMultiplier ?? tier.pointRate ?? 1));
 
   document.getElementById('summaryBase').textContent = formatCurrency(basePrice);
   document.getElementById('summaryTierDiscount').textContent = `-${formatCurrency(discount)}`;

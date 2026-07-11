@@ -471,10 +471,38 @@ function normalizeWashService(service) {
     serviceId: service.serviceId ?? numId(service.id),
     serviceName: service.serviceName || service.name || '',
     description: service.description || '',
+    vehicleType: service.vehicleType || inferServiceVehicleType(service.serviceName || service.name || ''),
     price: Number(service.price || 0),
     durationMinutes: Number(service.durationMinutes ?? service.duration ?? 30),
     isActive: service.isActive !== false && service.active !== false
   };
+}
+
+function inferServiceVehicleType(serviceName) {
+  const name = String(serviceName || '').toLowerCase();
+  if (/(motorbike|xe máy|xe may|moto)/i.test(name)) return 'Motorbike';
+  if (/(car|ô tô|oto|xe hơi)/i.test(name)) return 'Car';
+  return '';
+}
+
+function normalizeVehicleType(type) {
+  const value = String(type || '').trim().toLowerCase();
+  if (value.includes('motor') || value.includes('moto') || value.includes('xe máy') || value.includes('xe may')) {
+    return 'motorbike';
+  }
+  if (value.includes('car') || value.includes('oto') || value.includes('ô tô') || value.includes('xe hoi')) {
+    return 'car';
+  }
+  return value;
+}
+
+function serviceMatchesVehicleType(service, vehicleType) {
+  if (!vehicleType || !service.vehicleType) return true;
+  return normalizeVehicleType(service.vehicleType) === normalizeVehicleType(vehicleType);
+}
+
+function bookingServicesUseVehicleType() {
+  return bookingServices.some(s => s.vehicleType);
 }
 
 function normalizePromotion(promo) {

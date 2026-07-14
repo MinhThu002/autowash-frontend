@@ -1,65 +1,171 @@
-﻿<!DOCTYPE html>
+﻿<!doctype html>
 <html lang="vi">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Đặt lịch - AutoWash Pro</title>
-  <link rel="stylesheet" href="assets/css/style.css">
-  <link rel="stylesheet" href="assets/css/dashboard.css">
-  <link rel="stylesheet" href="assets/css/responsive.css">
-</head>
-<body>
-<div class="app-layout">
-  <div class="sidebar-overlay"></div>
-  <aside class="sidebar"><div class="sidebar-header"><a href="index.html" class="sidebar-logo">🚿 Auto<span>Wash</span> Pro</a><div class="sidebar-role">Khách hàng</div></div><nav class="sidebar-nav"><ul><li><a href="customer-dashboard.html" class=""><span class="nav-icon">📊</span>Dashboard</a></li><li><a href="customer-vehicles.html" class=""><span class="nav-icon">🚗</span>Xe của tôi</a></li><li><a href="booking.html" class="active"><span class="nav-icon">📅</span>Đặt lịch</a></li><li><a href="booking-history.html" class=""><span class="nav-icon">📋</span>Lịch sử</a></li><li><a href="loyalty.html" class=""><span class="nav-icon">⭐</span>Loyalty</a></li><li><a href="promotions.html" class=""><span class="nav-icon">🎁</span>Khuyến mãi</a></li></ul></nav><div class="sidebar-footer"><a href="#" onclick="logout();return false">🚪 Đăng xuất</a></div></aside>
-  <main class="main-content">
-    <header class="navbar">
-      <div class="navbar-left">
-        <button type="button" class="sidebar-toggle" aria-label="Menu">☰</button>
-        <div class="navbar-title"><h2>Đặt lịch</h2></div>
-      </div>
-      <div class="navbar-right">
-        <div class="navbar-user">
-          <div class="user-avatar">NA</div>
-          <div class="user-info"><div class="user-name">User</div><div class="user-tier">Member</div></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Đặt lịch - AutoWash Pro</title>
+    <link rel="stylesheet" href="assets/css/style.css" />
+    <link rel="stylesheet" href="assets/css/dashboard.css" />
+    <link rel="stylesheet" href="assets/css/responsive.css" />
+  </head>
+  <body data-page="booking">
+    <div class="app-layout">
+      <div class="sidebar-overlay"></div>
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <a href="index.html" class="sidebar-logo"
+            >🚿 Auto<span>Wash</span> Pro</a
+          >
+          <div class="sidebar-role">Khách hàng</div>
         </div>
-      </div>
-    </header>
-    <div class="page-content">
-<div class="booking-form-layout">
-  <div class="card">
-    <form id="bookingForm">
-      <div id="bookingWindowInfo" class="booking-window-info"></div>
-      <div class="form-group"><label>Chọn xe</label><select id="bookingVehicle" required><option value="">-- Chọn xe --</option></select></div>
-      <div class="form-group"><label>Chọn dịch vụ</label><select id="bookingService" required><option value="">-- Chọn dịch vụ --</option></select></div>
-      <div class="form-row">
-        <div class="form-group"><label>Ngày</label><input type="date" id="bookingDate" required></div>
-        <div class="form-group"><label>Khuyến mãi</label><select id="bookingPromotion"><option value="">Không dùng</option></select></div>
-      </div>
-      <div class="form-group"><label>Khung giờ</label><div id="timeSlots" class="time-slots"></div></div>
-      <button type="submit" class="btn btn-primary btn-lg">Xác nhận đặt lịch</button>
-    </form>
-  </div>
-  <div class="card">
-    <h3>Tóm tắt thanh toán</h3>
-    <div class="booking-summary">
-      <div class="booking-summary-row"><span>Giá gốc</span><span id="summaryBase">0đ</span></div>
-      <div class="booking-summary-row"><span>Giảm hạng</span><span id="summaryTierDiscount">-0đ</span></div>
-      <div class="booking-summary-row"><span>Giảm KM</span><span id="summaryPromoDiscount">-0đ</span></div>
-      <div class="booking-summary-row total"><span>Tổng cộng</span><span id="summaryTotal">0đ</span></div>
-      <div class="booking-summary-row"><span>Điểm dự kiến</span><span id="summaryPoints" class="text-primary">+0 điểm</span></div>
+        <nav class="sidebar-nav">
+          <ul>
+            <li>
+              <a href="customer-dashboard.html" class=""
+                ><span class="nav-icon">📊</span>Dashboard</a
+              >
+            </li>
+            <li>
+              <a href="customer-vehicles.html" class=""
+                ><span class="nav-icon">🚗</span>Xe của tôi</a
+              >
+            </li>
+            <li>
+              <a href="booking.html" class="active"
+                ><span class="nav-icon">📅</span>Đặt lịch</a
+              >
+            </li>
+            <li>
+              <a href="booking-history.html" class=""
+                ><span class="nav-icon">📋</span>Lịch sử</a
+              >
+            </li>
+            <li>
+              <a href="loyalty.html" class=""
+                ><span class="nav-icon">⭐</span>Loyalty</a
+              >
+            </li>
+            <li>
+              <a href="promotions.html" class=""
+                ><span class="nav-icon">🎁</span>Khuyến mãi</a
+              >
+            </li>
+          </ul>
+        </nav>
+        <div class="sidebar-footer">
+          <a
+            href="#"
+            onclick="
+              logout();
+              return false;
+            "
+            >🚪 Đăng xuất</a
+          >
+        </div>
+      </aside>
+      <main class="main-content">
+        <header class="navbar">
+          <div class="navbar-left">
+            <button type="button" class="sidebar-toggle" aria-label="Menu">
+              ☰
+            </button>
+            <div class="navbar-title"><h2>Booking</h2></div>
+          </div>
+          <div class="navbar-right">
+            <div class="navbar-user">
+              <div class="user-avatar" id="navUserAvatar">...</div>
+              <div class="user-info">
+                <div class="user-name" id="navUserName">Đang tải...</div>
+                <div class="user-tier" id="navUserTier">...</div>
+              </div>
+            </div>
+          </div>
+        </header>
+        <div class="page-content">
+          <div class="booking-form-layout">
+            <div class="card">
+              <form id="bookingForm">
+                <div id="bookingWindowInfo" class="booking-window-info"></div>
+                <div class="form-group">
+                  <label>Chọn xe</label
+                  ><select id="bookingVehicle" required>
+                    <option value="">-- Chọn xe --</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Chọn dịch vụ</label
+                  ><select id="bookingService" required>
+                    <option value="">-- Chọn dịch vụ --</option>
+                  </select>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Ngày</label>
+                    <input type="date" id="bookingDate" required />
+                  </div>
+                  <div class="form-group">
+                    <label>Khuyến mãi</label>
+                    <select id="bookingPromotion">
+                      <option value="">Không dùng</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Voucher (Quà đã đổi)</label>
+                  <select id="bookingReward">
+                    <option value="">Không dùng</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Khung giờ</label>
+                  <div id="timeSlots" class="time-slots"></div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg">
+                  Xác nhận đặt lịch
+                </button>
+              </form>
+            </div>
+            <div class="card">
+              <h3>Tóm tắt thanh toán</h3>
+              <div class="booking-summary">
+                <div class="booking-summary-row">
+                  <span>Giá gốc</span><span id="summaryBase">0đ</span>
+                </div>
+                <div class="booking-summary-row">
+                  <span>Giảm hạng</span
+                  ><span id="summaryTierDiscount">-0đ</span>
+                </div>
+                <div class="booking-summary-row">
+                  <span>Giảm KM</span><span id="summaryPromoDiscount">-0đ</span>
+                </div>
+                <div class="booking-summary-row">
+                  <span>Giảm Voucher</span
+                  ><span id="summaryRewardDiscount">-0đ</span>
+                </div>
+                <!-- Hàng mới bổ sung để hiển thị thuộc tính addOn của response -->
+                <div class="booking-summary-row">
+                  <span>Ưu đãi kèm theo</span
+                  ><span id="summaryAddOn" class="text-muted">NONE</span>
+                </div>
+                <div class="booking-summary-row total">
+                  <span>Tổng cộng</span><span id="summaryTotal">0đ</span>
+                </div>
+                <div class="booking-summary-row">
+                  <span>Điểm dự kiến</span
+                  ><span id="summaryPoints" class="text-primary">+0 điểm</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
     </div>
-  </div>
-</div>
-</div>
-  </main>
-</div>
-  <script src="assets/js/mock-data.js"></script>
-  <script src="assets/js/api-config.js"></script>
-  <script src="assets/js/mock-api.js"></script>
-  <script src="assets/js/main.js"></script>
-  <script src="assets/js/modal.js"></script>
-  <script src="assets/js/dashboard.js"></script>
-  <script src="assets/js/booking.js"></script>
-</body>
+    <script src="assets/js/mock-data.js"></script>
+    <script src="assets/js/api-config.js"></script>
+    <script src="assets/js/mock-api.js"></script>
+    <script src="assets/js/main.js"></script>
+    <script src="assets/js/modal.js"></script>
+    <script src="assets/js/dashboard.js"></script>
+    <script src="assets/js/booking.js"></script>
+  </body>
 </html>

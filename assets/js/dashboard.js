@@ -1,4 +1,4 @@
-/* AutoWash Pro - Dashboard & Page Renderers */
+/* AutoWash Pro - Dashboard & Page Renderers (aligned with WashPRo.sql) */
 document.addEventListener('DOMContentLoaded', () => {
   const page = document.body.dataset.page;
   if (!page) return;
@@ -38,49 +38,50 @@ function setupTableFiltersForPage(page) {
 
 function renderCustomerDashboard() {
   const customer = getCurrentCustomer();
-  const tier = getTierById(customer.tier);
-  const nextTierIdx = MOCK_DATA.loyaltyTiers.findIndex(t => t.id === customer.tier) + 1;
+  const tier = getTierById(customer.tierId);
+  const nextTierIdx = MOCK_DATA.loyaltyTiers.findIndex(t => t.tierId === tier.tierId) + 1;
   const nextTier = MOCK_DATA.loyaltyTiers[nextTierIdx];
 
   setUserNav(customer);
-  document.getElementById('welcomeName').textContent = customer.name;
-  document.getElementById('currentTier').textContent = tier.name;
-  document.getElementById('pointsBalance').textContent = customer.points.toLocaleString('vi-VN');
+  document.getElementById('welcomeName').textContent = customer.fullName;
+  document.getElementById('currentTier').textContent = tier.tierName;
+  document.getElementById('pointsBalance').textContent = customer.currentPoints.toLocaleString('vi-VN');
   document.getElementById('totalVisits').textContent = customer.totalVisits;
-  document.getElementById('totalSpending').textContent = formatCurrency(customer.totalSpending);
+  document.getElementById('totalSpending').textContent = formatCurrency(customer.totalSpend);
 
   if (nextTier) {
-    const visitProgress = Math.min(100, (customer.totalVisits / nextTier.requiredVisits) * 100);
-    const spendProgress = Math.min(100, (customer.totalSpending / nextTier.requiredSpending) * 100);
+    const visitProgress = nextTier.minVisits ? Math.min(100, (customer.totalVisits / nextTier.minVisits) * 100) : 100;
+    const spendProgress = nextTier.minSpending ? Math.min(100, (customer.totalSpend / nextTier.minSpending) * 100) : 100;
     const progress = Math.round((visitProgress + spendProgress) / 2);
-    document.getElementById('nextTierName').textContent = nextTier.name;
+    document.getElementById('nextTierName').textContent = nextTier.tierName;
     document.getElementById('tierProgressFill').style.width = progress + '%';
-    document.getElementById('tierProgressText').textContent = `${progress}% đến ${nextTier.name}`;
+    document.getElementById('tierProgressText').textContent = `${progress}% đến ${nextTier.tierName}`;
   } else {
     document.getElementById('nextTierName').textContent = 'Tối đa';
     document.getElementById('tierProgressFill').style.width = '100%';
     document.getElementById('tierProgressText').textContent = 'Bạn đã ở hạng cao nhất!';
   }
 
-  const bookings = getBookings().filter(b => b.customerId === customer.id);
-  const upcoming = bookings.find(b => ['pending', 'confirmed'].includes(b.status) && b.date >= new Date().toISOString().split('T')[0]);
+  const bookings = getEnrichedBookings().filter(b => Number(b.customerId) === Number(customer.customerId));
+  const today = new Date().toISOString().split('T')[0];
+  const upcoming = bookings.find(b => ['pending', 'confirmed'].includes(normalizeStatus(b.status)) && b.bookingDate >= today);
   const upcomingEl = document.getElementById('upcomingBooking');
   if (upcoming) {
-    upcomingEl.innerHTML = `<div class="list-item"><div><strong>${upcoming.serviceName}</strong><br><span class="list-item-meta">${formatDate(upcoming.date)} • ${upcoming.time} • ${upcoming.vehiclePlate}</span></div><div>${getStatusBadge(upcoming.status)}</div></div>`;
+    upcomingEl.innerHTML = `<div class="list-item"><div><strong>${upcoming.serviceType}</strong><br><span class="list-item-meta">${formatDate(upcoming.bookingDate)} • ${upcoming.bookingTime} • ${upcoming.vehiclePlate}</span></div><div>${getStatusBadge(upcoming.status)}</div></div>`;
   } else {
     upcomingEl.innerHTML = '<p class="text-muted">Chưa có lịch hẹn sắp tới. <a href="booking.html">Đặt lịch ngay</a></p>';
   }
 
   const historyEl = document.getElementById('recentHistory');
-  const completed = bookings.filter(b => b.status === 'completed').slice(0, 5);
+  const completed = bookings.filter(b => normalizeStatus(b.status) === 'completed').slice(0, 5);
   historyEl.innerHTML = completed.length
-    ? completed.map(b => `<div class="list-item"><div><strong>${b.serviceName}</strong><br><span class="list-item-meta">${formatDate(b.date)} • ${b.vehiclePlate}</span></div><div>${formatCurrency(b.totalPrice)}</div></div>`).join('')
+    ? completed.map(b => `<div class="list-item"><div><strong>${b.serviceType}</strong><br><span class="list-item-meta">${formatDate(b.bookingDate)} • ${b.vehiclePlate}</span></div><div>${b.amountPaid != null ? formatCurrency(b.amountPaid) : '-'}</div></div>`).join('')
     : '<p class="text-muted">Chưa có lịch sử.</p>';
 
   const promosEl = document.getElementById('recommendedPromos');
-  getPromotions().filter(p => p.status === 'active').slice(0, 3).forEach(p => {
-    const disc = p.discountType === 'percent' ? `${p.discountValue}%` : formatCurrency(p.discountValue);
-    promosEl.innerHTML += `<div class="promotion-card"><h4>${p.name}</h4><p class="text-muted">${p.description}</p><span class="discount">-${disc}</span><a href="promotions.html" class="btn btn-sm btn-primary" style="margin-top:0.5rem">Xem chi tiết</a></div>`;
+  promosEl.innerHTML = '';
+  getPromotions().filter(p => normalizeStatus(p.status) === 'active').slice(0, 3).forEach(p => {
+    promosEl.innerHTML += `<div class="promotion-card"><h4>${p.title}</h4><p class="text-muted">${p.description || ''}</p><span class="discount">-${p.discountPercent}%</span><a href="promotions.html" class="btn btn-sm btn-primary" style="margin-top:0.5rem">Xem chi tiết</a></div>`;
   });
 }
 
@@ -107,7 +108,6 @@ function renderVehiclesPage() {
           <div class="vehicle-card-info">
             <h4>${v.licensePlate}</h4>
             <p>${v.brand} • ${v.vehicleType} • ${v.color}</p>
-            ${v.notes ? `<p class="text-muted">${v.notes}</p>` : ''}
           </div>
           <div class="actions">
             <button class="btn btn-sm btn-secondary" onclick="editVehicle(${v.vehicleId})">Sửa</button>
@@ -140,16 +140,19 @@ async function saveVehicle(e) {
     return;
   }
 
-  if (!window.AutoWashAPI) {
-    showToast('API chưa sẵn sàng.');
-    return;
-  }
-
   try {
-    if (vehicleId) {
-      await window.AutoWashAPI.vehicles.update(Number(vehicleId), payload);
+    if (window.AutoWashAPI && usesRealApi()) {
+      if (vehicleId) await window.AutoWashAPI.vehicles.update(Number(vehicleId), payload);
+      else await window.AutoWashAPI.vehicles.create(payload);
     } else {
-      await window.AutoWashAPI.vehicles.create(payload);
+      let vehicles = getVehicles();
+      if (vehicleId) {
+        vehicles = vehicles.map(v => Number(v.vehicleId) === Number(vehicleId) ? { ...v, ...payload, vehicleId: Number(vehicleId) } : v);
+      } else {
+        const nextId = vehicles.reduce((m, v) => Math.max(m, Number(v.vehicleId) || 0), 0) + 1;
+        vehicles.push({ vehicleId: nextId, ...payload });
+      }
+      saveToStorage('vehicles', vehicles);
     }
     closeModal('vehicleModal');
     showToast(vehicleId ? 'Cập nhật xe thành công!' : 'Thêm xe thành công!');
@@ -179,20 +182,18 @@ async function editVehicle(id) {
   document.getElementById('vehicleType').value = vehicle.vehicleType;
   document.getElementById('vehicleBrand').value = vehicle.brand;
   document.getElementById('vehicleColor').value = vehicle.color;
-  document.getElementById('vehicleNotes').value = vehicle.notes || '';
   openModal('vehicleModal');
 }
 
 async function deleteVehicle(id) {
   if (!confirm('Bạn có chắc muốn xóa xe này?')) return;
 
-  if (!window.AutoWashAPI) {
-    showToast('API chưa sẵn sàng.');
-    return;
-  }
-
   try {
-    await window.AutoWashAPI.vehicles.remove(Number(id));
+    if (window.AutoWashAPI && usesRealApi()) {
+      await window.AutoWashAPI.vehicles.remove(Number(id));
+    } else {
+      saveToStorage('vehicles', getVehicles().filter(v => Number(v.vehicleId) !== Number(id)));
+    }
     showToast('Đã xóa xe.');
     await renderVehiclesPage();
   } catch (error) {
@@ -211,77 +212,120 @@ function renderBookingHistory() {
   const customer = getCurrentCustomer();
   setUserNav(customer);
   const tbody = document.querySelector('#bookingsTable tbody');
-  getBookings().filter(b => b.customerId === customer.id).forEach(b => {
-    tbody.innerHTML += `<tr data-status="${b.status}" data-date="${b.date}">
-      <td><strong>${b.id}</strong></td>
-      <td>${formatDate(b.date)}</td>
-      <td>${b.time}</td>
+  tbody.innerHTML = '';
+  getEnrichedBookings().filter(b => Number(b.customerId) === Number(customer.customerId)).forEach(b => {
+    tbody.innerHTML += `<tr data-status="${normalizeStatus(b.status)}" data-date="${b.bookingDate}">
+      <td><strong>#${b.bookingId}</strong></td>
+      <td>${formatDate(b.bookingDate)}</td>
+      <td>${b.bookingTime}</td>
       <td>${b.vehiclePlate}</td>
-      <td>${b.serviceName}</td>
+      <td>${b.serviceType}</td>
       <td>${getStatusBadge(b.status)}</td>
-      <td>${formatCurrency(b.totalPrice)}</td>
-      <td>${b.pointsEarned || '-'}</td>
+      <td>${b.amountPaid != null ? formatCurrency(b.amountPaid) : '-'}</td>
+      <td>${b.pointsEarned != null ? b.pointsEarned : '-'}</td>
     </tr>`;
   });
 }
 
 function renderLoyaltyPage() {
   const customer = getCurrentCustomer();
-  const tier = getTierById(customer.tier);
+  const tier = getTierById(customer.tierId);
   setUserNav(customer);
 
-  document.getElementById('loyaltyTierName').textContent = tier.name;
-  document.getElementById('loyaltyPoints').textContent = customer.points.toLocaleString('vi-VN');
-  document.querySelector('.current-tier-card')?.classList.add(customer.tier);
+  document.getElementById('loyaltyTierName').textContent = tier.tierName;
+  document.getElementById('loyaltyPoints').textContent = customer.currentPoints.toLocaleString('vi-VN');
+  document.querySelector('.current-tier-card')?.classList.add(tierKey(tier));
 
   const benefitsEl = document.getElementById('tierBenefitsList');
-  benefitsEl.innerHTML = tier.benefits.map(b => `<li>${b}</li>`).join('');
+  benefitsEl.innerHTML = getTierBenefits(tier.tierId).map(b => `<li>${b}</li>`).join('');
 
-  const nextIdx = MOCK_DATA.loyaltyTiers.findIndex(t => t.id === customer.tier) + 1;
+  const nextIdx = MOCK_DATA.loyaltyTiers.findIndex(t => t.tierId === tier.tierId) + 1;
   const next = MOCK_DATA.loyaltyTiers[nextIdx];
   if (next) {
-    document.getElementById('loyaltyNextTier').textContent = next.name;
-    const p = Math.min(100, Math.round(((customer.totalVisits / next.requiredVisits) + (customer.totalSpending / next.requiredSpending)) / 2 * 100));
+    document.getElementById('loyaltyNextTier').textContent = next.tierName;
+    const p = Math.min(100, Math.round(((customer.totalVisits / Math.max(next.minVisits, 1)) + (customer.totalSpend / Math.max(next.minSpending, 1))) / 2 * 100));
     document.getElementById('loyaltyProgressFill').style.width = p + '%';
-    document.getElementById('loyaltyProgressLabel').textContent = `${p}% — Cần ${next.requiredVisits} lượt & ${formatCurrency(next.requiredSpending)}`;
+    document.getElementById('loyaltyProgressLabel').textContent = `${p}% — Cần ${next.minVisits} lượt & ${formatCurrency(next.minSpending)}`;
   }
 
   const txEl = document.querySelector('#pointsHistory tbody');
-  MOCK_DATA.loyaltyTransactions.filter(t => t.customerId === customer.id).forEach(t => {
-    const sign = t.points > 0 ? '+' : '';
-    txEl.innerHTML += `<tr><td>${formatDate(t.date)}</td><td>${t.description}</td><td><span class="${t.points > 0 ? 'text-primary' : 'text-muted'}">${sign}${t.points}</span></td></tr>`;
+  txEl.innerHTML = '';
+  getLoyaltyPoints().filter(t => Number(t.customerId) === Number(customer.customerId)).forEach(t => {
+    const sign = t.pointsChange > 0 ? '+' : '';
+    const label = `${t.transactionType}${t.washId ? ` • Wash #${t.washId}` : ''}${t.expiryDate ? ` • HSD ${formatDate(t.expiryDate)}` : ''}`;
+    txEl.innerHTML += `<tr><td>${formatDate(String(t.createdAt).slice(0, 10))}</td><td>${label}</td><td><span class="${t.pointsChange > 0 ? 'text-primary' : 'text-muted'}">${sign}${t.pointsChange}</span></td></tr>`;
   });
 
   const rewardsEl = document.getElementById('rewardsList');
-  MOCK_DATA.rewards.forEach(r => {
-    rewardsEl.innerHTML += `<div class="reward-item"><h4>${r.name}</h4><p class="text-muted">${r.description}</p><div class="points-cost">${r.pointsCost} điểm</div><button class="btn btn-sm btn-primary" onclick="redeemReward('${r.id}', ${r.pointsCost})">Đổi thưởng</button></div>`;
+  rewardsEl.innerHTML = '';
+  getRewardCatalog().filter(r => r.isActive !== false).forEach(r => {
+    const extra = r.freeWash ? ' • Rửa miễn phí' : (r.discountAmount ? ` • ${formatCurrency(r.discountAmount)}` : '');
+    rewardsEl.innerHTML += `<div class="reward-item"><h4>${r.rewardName}</h4><p class="text-muted">${extra}</p><div class="points-cost">${r.pointsRequired} điểm</div><button class="btn btn-sm btn-primary" onclick="redeemReward(${r.rewardId}, ${r.pointsRequired})">Đổi thưởng</button></div>`;
   });
 }
 
 function redeemReward(id, cost) {
   const customer = getCurrentCustomer();
-  if (customer.points < cost) {
+  if (customer.currentPoints < cost) {
     showToast('Không đủ điểm để đổi thưởng.');
     return;
   }
-  showToast('Đổi thưởng thành công! Voucher đã được thêm vào tài khoản.');
+
+  const reward = getRewardCatalog().find(r => Number(r.rewardId) === Number(id));
+  if (!reward || reward.isActive === false) {
+    showToast('Phần thưởng không khả dụng.');
+    return;
+  }
+
+  customer.currentPoints -= cost;
+  const customers = loadFromStorage('customers', [...MOCK_DATA.customers]).map(c =>
+    Number(c.customerId) === Number(customer.customerId) ? { ...c, currentPoints: customer.currentPoints } : c
+  );
+  saveToStorage('customers', customers);
+
+  const redemptions = loadFromStorage('rewardRedemptions', [...MOCK_DATA.rewardRedemptions]);
+  const redemptionId = redemptions.reduce((m, r) => Math.max(m, Number(r.redemptionId) || 0), 0) + 1;
+  redemptions.push({
+    redemptionId,
+    customerId: customer.customerId,
+    rewardId: Number(id),
+    pointsUsed: cost,
+    redemptionDate: new Date().toISOString()
+  });
+  saveToStorage('rewardRedemptions', redemptions);
+
+  const points = getLoyaltyPoints();
+  const pointId = points.reduce((m, p) => Math.max(m, Number(p.pointId) || 0), 0) + 1;
+  points.unshift({
+    pointId,
+    customerId: customer.customerId,
+    washId: null,
+    pointsChange: -cost,
+    transactionType: 'Redeem',
+    expiryDate: null,
+    createdAt: new Date().toISOString()
+  });
+  saveToStorage('loyaltyPoints', points);
+
+  showToast('Đổi thưởng thành công!');
+  renderLoyaltyPage();
 }
 
 function renderPromotionsPage() {
   const customer = getCurrentCustomer();
   setUserNav(customer);
   const grid = document.getElementById('promotionsGrid');
-  getPromotions().filter(p => p.status === 'active').forEach(p => {
-    const disc = p.discountType === 'percent' ? `${p.discountValue}%` : formatCurrency(p.discountValue);
-    const tierLabel = p.targetTier === 'all' ? 'Tất cả hạng' : getTierById(p.targetTier).name;
+  grid.innerHTML = '';
+  getPromotions().filter(p => normalizeStatus(p.status) === 'active').forEach(p => {
+    const tierLabel = p.minTierId == null ? 'Tất cả hạng' : `${getTierById(p.minTierId).tierName}+`;
     grid.innerHTML += `
       <div class="promotion-card">
-        <h4>${p.name}</h4>
-        <p class="text-muted">${p.description}</p>
-        <span class="discount">Giảm ${disc}</span>
+        <h4>${p.title}</h4>
+        <p class="text-muted">${p.description || ''}</p>
+        <span class="discount">Giảm ${p.discountPercent}%</span>
         <p class="text-muted" style="font-size:0.8125rem">HSD: ${formatDate(p.startDate)} - ${formatDate(p.endDate)}</p>
         <p style="font-size:0.8125rem">Áp dụng: ${tierLabel}</p>
-        <button class="btn btn-sm btn-primary" onclick="usePromotion('${p.id}')">Sử dụng</button>
+        <button class="btn btn-sm btn-primary" onclick="usePromotion(${p.promotionId})">Sử dụng</button>
       </div>`;
   });
 }
@@ -304,11 +348,12 @@ function renderAdminDashboard() {
   renderTierChart(d.customersByTier);
 
   const tbody = document.querySelector('#recentBookingsTable tbody');
-  getBookings().slice(0, 8).forEach(b => {
+  tbody.innerHTML = '';
+  getEnrichedBookings().slice(0, 8).forEach(b => {
     tbody.innerHTML += `<tr>
-      <td>${b.id}</td><td>${b.customerName}</td><td>${b.serviceName}</td>
-      <td>${formatDate(b.date)} ${b.time}</td><td>${getStatusBadge(b.status)}</td>
-      <td>${formatCurrency(b.totalPrice)}</td></tr>`;
+      <td>#${b.bookingId}</td><td>${b.customerName}</td><td>${b.serviceType}</td>
+      <td>${formatDate(b.bookingDate)} ${b.bookingTime}</td><td>${getStatusBadge(b.status)}</td>
+      <td>${b.amountPaid != null ? formatCurrency(b.amountPaid) : '-'}</td></tr>`;
   });
 }
 
@@ -328,13 +373,13 @@ function renderAdminCustomers() {
       }
 
       tbody.innerHTML = customers.map(c => {
-        const tierKey = normalizeTierKey(c.loyaltyTier);
+        const tierKeyName = normalizeTierKey(c.loyaltyTier || c.tierId);
         const searchText = `${c.fullName} ${c.phoneNumber} ${c.email}`.toLowerCase();
-        return `<tr data-tier="${tierKey}" data-search="${searchText}">
+        return `<tr data-tier="${tierKeyName}" data-search="${searchText}">
           <td><strong>${c.fullName}</strong></td>
           <td>${c.phoneNumber}</td>
-          <td>${c.email}</td>
-          <td>${getTierBadgeFromLoyaltyTier(c.loyaltyTier)}</td>
+          <td>${c.email || '-'}</td>
+          <td>${getTierBadge(c.tierId || c.loyaltyTier)}</td>
           <td>${c.currentPoints.toLocaleString('vi-VN')}</td>
           <td>${c.totalVisits}</td>
           <td>${formatCurrency(c.totalSpend)}</td>
@@ -354,63 +399,98 @@ function renderAdminCustomers() {
 
 function renderAdminBookings() {
   const tbody = document.querySelector('#adminBookingsTable tbody');
-  getBookings().forEach(b => {
-    tbody.innerHTML += `<tr data-status="${b.status}" data-id="${b.id}">
-      <td>${b.customerName}</td><td>${b.vehiclePlate}</td><td>${b.serviceName}</td>
-      <td>${formatDate(b.date)}</td><td>${b.time}</td><td>${getStatusBadge(b.status)}</td>
-      <td>${formatCurrency(b.totalPrice)}</td>
+  tbody.innerHTML = '';
+  getEnrichedBookings().forEach(b => {
+    tbody.innerHTML += `<tr data-status="${normalizeStatus(b.status)}" data-id="${b.bookingId}">
+      <td>${b.customerName}</td><td>${b.vehiclePlate}</td><td>${b.serviceType}</td>
+      <td>${formatDate(b.bookingDate)}</td><td>${b.bookingTime}</td><td>${getStatusBadge(b.status)}</td>
+      <td>${b.amountPaid != null ? formatCurrency(b.amountPaid) : '-'}</td>
       <td class="actions">
-        <button class="btn btn-sm btn-secondary" onclick="updateBookingStatus('${b.id}','confirmed')">Xác nhận</button>
-        <button class="btn btn-sm btn-primary" onclick="updateBookingStatus('${b.id}','in_progress')">Đang rửa</button>
-        <button class="btn btn-sm btn-primary" onclick="updateBookingStatus('${b.id}','completed')">Hoàn thành</button>
-        <button class="btn btn-sm btn-danger" onclick="updateBookingStatus('${b.id}','cancelled')">Hủy</button>
+        <button class="btn btn-sm btn-secondary" onclick="updateBookingStatus(${b.bookingId},'Confirmed')">Xác nhận</button>
+        <button class="btn btn-sm btn-primary" onclick="updateBookingStatus(${b.bookingId},'In_Progress')">Đang rửa</button>
+        <button class="btn btn-sm btn-primary" onclick="updateBookingStatus(${b.bookingId},'Completed')">Hoàn thành</button>
+        <button class="btn btn-sm btn-danger" onclick="updateBookingStatus(${b.bookingId},'Cancelled')">Hủy</button>
       </td></tr>`;
   });
 }
 
 function updateBookingStatus(id, status) {
-  const bookings = getBookings().map(b => b.id === id ? { ...b, status } : b);
+  const bookings = getBookings().map(b => Number(b.bookingId) === Number(id) ? { ...b, status } : b);
   saveToStorage('bookings', bookings);
+
+  if (status === 'Cancelled') {
+    const updated = getBookings().map(b => Number(b.bookingId) === Number(id) ? { ...b, cancelledByAdminId: 1 } : b);
+    saveToStorage('bookings', updated);
+  }
+
+  if (status === 'Completed') {
+    const booking = getBookings().find(b => Number(b.bookingId) === Number(id));
+    if (booking && !getWashForBooking(id)) {
+      const history = getWashHistory();
+      const washId = history.reduce((m, w) => Math.max(m, Number(w.washId) || 0), 0) + 1;
+      const amountPaid = getServiceBasePrice(booking.serviceType);
+      const tier = getTierById(booking.tierIdAtBooking);
+      const pointsEarned = Math.round(amountPaid / 1000 * tier.pointMultiplier);
+      history.push({
+        washId,
+        bookingId: Number(id),
+        washDate: new Date().toISOString(),
+        amountPaid,
+        pointsEarned,
+        pointsUsed: 0,
+        perkApplied: getTierDiscountPercent(tier.tierId) ? `Giảm ${getTierDiscountPercent(tier.tierId)}%` : 'Không'
+      });
+      saveToStorage('washHistory', history);
+    }
+  }
+
   showToast('Cập nhật trạng thái thành công!');
   location.reload();
 }
 
 function renderAdminServices() {
   const tbody = document.querySelector('#servicesTable tbody');
-  getServices().forEach(s => {
-    tbody.innerHTML += `<tr data-id="${s.id}">
-      <td><strong>${s.name}</strong></td><td>${s.vehicleType}</td><td>${s.duration} phút</td>
-      <td>${formatCurrency(s.price)}</td><td>${s.description}</td>
-      <td>${getStatusBadge(s.active ? 'active' : 'inactive')}</td>
+  tbody.innerHTML = '';
+  getServiceCatalog().forEach((s, index) => {
+    tbody.innerHTML += `<tr data-id="${index}">
+      <td><strong>${s.serviceType}</strong></td>
+      <td>${formatCurrency(s.basePrice)}</td>
+      <td class="text-muted">Lưu vào Booking.service_type</td>
       <td class="actions">
-        <button class="btn btn-sm btn-secondary" onclick="editService('${s.id}')">Sửa</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteService('${s.id}')">Xóa</button>
+        <button class="btn btn-sm btn-secondary" onclick="editService(${index})">Sửa</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteService(${index})">Xóa</button>
       </td></tr>`;
   });
 }
 
 function renderAdminTiers() {
   const tbody = document.querySelector('#tiersTable tbody');
+  tbody.innerHTML = '';
   MOCK_DATA.loyaltyTiers.forEach(t => {
+    const perks = getPerksForTier(t.tierId).map(describePerk).join('; ') || '—';
     tbody.innerHTML += `<tr>
-      <td><strong>${t.name}</strong></td><td>${t.requiredVisits}</td><td>${formatCurrency(t.requiredSpending)}</td>
-      <td>x${t.pointRate}</td><td>${t.bookingWindow} ngày</td><td>${t.discountPercent}%</td>
-      <td>${t.benefits.join(', ')}</td></tr>`;
+      <td><strong>${t.tierName}</strong></td>
+      <td>${t.minVisits}</td>
+      <td>${formatCurrency(t.minSpending)}</td>
+      <td>x${t.pointMultiplier}</td>
+      <td>${t.bookingWindowDays} ngày</td>
+      <td>${t.priorityLevel}</td>
+      <td>${perks}</td></tr>`;
   });
 }
 
 function renderAdminPromotions() {
   const tbody = document.querySelector('#promotionsTable tbody');
+  tbody.innerHTML = '';
   getPromotions().forEach(p => {
-    const disc = p.discountType === 'percent' ? `${p.discountValue}%` : formatCurrency(p.discountValue);
-    tbody.innerHTML += `<tr data-id="${p.id}">
-      <td><strong>${p.name}</strong></td><td>${p.description}</td><td>${disc}</td>
+    const tierLabel = p.minTierId == null ? 'Tất cả' : `${getTierById(p.minTierId).tierName}+`;
+    tbody.innerHTML += `<tr data-id="${p.promotionId}">
+      <td><strong>${p.title}</strong></td><td>${p.description || '-'}</td><td>${p.discountPercent}%</td>
       <td>${formatDate(p.startDate)}</td><td>${formatDate(p.endDate)}</td>
-      <td>${p.targetTier === 'all' ? 'Tất cả' : getTierById(p.targetTier).name}</td>
-      <td>${p.usedCount}/${p.usageLimit}</td><td>${getStatusBadge(p.status)}</td>
+      <td>${tierLabel}</td><td>${getStatusBadge(p.status)}</td>
       <td class="actions">
-        <button class="btn btn-sm btn-secondary" onclick="editPromotion('${p.id}')">Sửa</button>
-        <button class="btn btn-sm btn-danger" onclick="deletePromotion('${p.id}')">Xóa</button>
+        <button class="btn btn-sm btn-secondary" onclick="editPromotion(${p.promotionId})">Sửa</button>
+        <button class="btn btn-sm btn-danger" onclick="deletePromotion(${p.promotionId})">Xóa</button>
       </td></tr>`;
   });
 }
@@ -422,12 +502,12 @@ function renderAdminRewards() {
   const tbody = document.querySelector('#rewardsTable tbody');
   if (!tbody) return;
 
-  tbody.innerHTML = '<tr><td colspan="8">Đang tải danh sách quà tặng...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7">Đang tải danh sách quà tặng...</td></tr>';
 
   fetchAdminRewards()
     .then(rewards => {
       if (!rewards.length) {
-        tbody.innerHTML = '<tr><td colspan="8">Chưa có quà tặng nào.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7">Chưa có quà tặng nào.</td></tr>';
         return;
       }
 
@@ -435,10 +515,9 @@ function renderAdminRewards() {
         <tr data-id="${r.rewardId}">
           <td>${r.rewardId}</td>
           <td><strong>${r.rewardName}</strong></td>
-          <td>${r.description || '-'}</td>
           <td>${r.pointsRequired.toLocaleString('vi-VN')}</td>
           <td>${formatCurrency(r.discountAmount)}</td>
-          <td>${r.stockQuantity}</td>
+          <td>${r.freeWash ? 'Có' : 'Không'}</td>
           <td>${getStatusBadge(r.isActive ? 'active' : 'inactive')}</td>
           <td class="actions">
             <button class="btn btn-sm btn-secondary" onclick="editReward(${r.rewardId})">Sửa</button>
@@ -447,7 +526,7 @@ function renderAdminRewards() {
         </tr>`).join('');
     })
     .catch(error => {
-      tbody.innerHTML = '<tr><td colspan="8">Không tải được danh sách quà tặng.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7">Không tải được danh sách quà tặng.</td></tr>';
       showToast(error.message || 'Không tải được danh sách quà tặng.');
     });
 }
@@ -460,14 +539,15 @@ function renderAdminAnalytics() {
 
   document.getElementById('rewardUsageRate').textContent = d.rewardUsageRate + '%';
   document.getElementById('rewardUsageFill').style.width = d.rewardUsageRate + '%';
-  
 
   const topEl = document.getElementById('topCustomers');
+  topEl.innerHTML = '';
   d.topLoyalCustomers.forEach((c, i) => {
     topEl.innerHTML += `<li><span><span class="rank">${i + 1}</span>${c.name}</span><span>${c.visits} lượt • ${formatCurrency(c.spending)}</span></li>`;
   });
 
   const svcEl = document.getElementById('topServices');
+  svcEl.innerHTML = '';
   d.topServices.forEach(s => {
     svcEl.innerHTML += `<li><span>${s.name}</span><span>${s.count} lượt</span></li>`;
   });
@@ -475,7 +555,11 @@ function renderAdminAnalytics() {
 
 function renderStaffSchedule() {
   const container = document.getElementById('scheduleList');
-  const schedule = loadFromStorage('staffSchedule', MOCK_DATA.staffSchedule);
+  const schedule = buildStaffScheduleFromBookings();
+  if (!schedule.length) {
+    container.innerHTML = '<p class="text-muted">Chưa có lịch từ bảng Booking.</p>';
+    return;
+  }
   container.innerHTML = schedule.map(s => `
     <div class="schedule-item">
       <div class="schedule-time">${s.time}</div>
@@ -485,27 +569,23 @@ function renderStaffSchedule() {
       </div>
       <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
         ${getStatusBadge(s.status)}
-        ${s.status !== 'in_progress' ? `<button class="btn btn-sm btn-primary" onclick="updateScheduleStatus('${s.id}','in_progress')">Bắt đầu</button>` : ''}
-        ${s.status !== 'completed' ? `<button class="btn btn-sm btn-secondary" onclick="updateScheduleStatus('${s.id}','completed')">Hoàn thành</button>` : ''}
+        ${normalizeStatus(s.status) !== 'in_progress' ? `<button class="btn btn-sm btn-primary" onclick="updateScheduleStatus(${s.bookingId},'In_Progress')">Bắt đầu</button>` : ''}
+        ${normalizeStatus(s.status) !== 'completed' ? `<button class="btn btn-sm btn-secondary" onclick="updateScheduleStatus(${s.bookingId},'Completed')">Hoàn thành</button>` : ''}
       </div>
     </div>`).join('');
 }
 
-function updateScheduleStatus(id, status) {
-  let schedule = loadFromStorage('staffSchedule', [...MOCK_DATA.staffSchedule]);
-  schedule = schedule.map(s => s.id === id ? { ...s, status } : s);
-  saveToStorage('staffSchedule', schedule);
-  showToast('Cập nhật lịch thành công!');
-  renderStaffSchedule();
+function updateScheduleStatus(bookingId, status) {
+  updateBookingStatus(bookingId, status);
 }
 
 function setUserNav(customer) {
   const user = requireAuth(['customer']);
   if (!user) return;
-  const name = customer?.name || user.name;
+  const name = customer?.fullName || user.name;
   document.querySelectorAll('.user-name').forEach(el => el.textContent = name);
   document.querySelectorAll('.user-tier').forEach(el => {
-    if (customer) el.textContent = getTierById(customer.tier).name;
+    if (customer) el.textContent = getTierById(customer.tierId).tierName;
   });
   document.querySelectorAll('.user-avatar').forEach(el => el.textContent = getUserInitials(name));
 }
@@ -513,16 +593,16 @@ function setUserNav(customer) {
 function renderBarChart(containerId, data, labels, small) {
   const container = document.getElementById(containerId);
   if (!container) return;
-  const max = Math.max(...data);
+  const max = Math.max(...data, 1);
   container.innerHTML = '<div class="chart-container">' +
-    data.map((v, i) => `<div class="chart-bar" style="height:${Math.round((v / max) * 100)}%" data-value="${small ? v : formatCurrency(v)}"></div>`).join('') +
+    data.map((v) => `<div class="chart-bar" style="height:${Math.round((v / max) * 100)}%" data-value="${small ? v : formatCurrency(v)}"></div>`).join('') +
     '</div><div class="chart-labels">' + labels.map(l => `<span>${l}</span>`).join('') + '</div>';
 }
 
 function renderTierChart(data, containerId) {
   const el = document.getElementById(containerId || 'tierChart');
   if (!el) return;
-  const total = Object.values(data).reduce((a, b) => a + b, 0);
+  const total = Object.values(data).reduce((a, b) => a + b, 0) || 1;
   const colors = { member: '#94a3b8', silver: '#64748b', gold: '#f59e0b', platinum: '#8b5cf6' };
   let gradient = [];
   let acc = 0;
@@ -533,11 +613,11 @@ function renderTierChart(data, containerId) {
   });
   el.innerHTML = `<div class="donut-chart" style="background:conic-gradient(${gradient.join(',')})"></div>
     <div class="donut-legend" style="margin-top:1rem">
-      ${Object.entries(data).map(([t, c]) => `<div class="legend-item"><span class="legend-dot" style="background:${colors[t]}"></span>${getTierById(t).name}: ${c}</div>`).join('')}
+      ${Object.entries(data).map(([t, c]) => `<div class="legend-item"><span class="legend-dot" style="background:${colors[t]}"></span>${getTierById(t).tierName}: ${c}</div>`).join('')}
     </div>`;
 }
 
-function initCrudModals(page) {
+function initCrudModals() {
   document.getElementById('vehicleForm')?.addEventListener('submit', saveVehicle);
   document.getElementById('serviceForm')?.addEventListener('submit', saveService);
   document.getElementById('promotionForm')?.addEventListener('submit', savePromotion);
@@ -546,40 +626,37 @@ function initCrudModals(page) {
 
 function saveService(e) {
   e.preventDefault();
-  const id = document.getElementById('serviceId').value;
+  const index = document.getElementById('serviceId').value;
   const data = {
-    id: id || 'svc-' + Date.now(),
-    name: document.getElementById('serviceName').value,
-    vehicleType: document.getElementById('serviceVehicleType').value,
-    duration: parseInt(document.getElementById('serviceDuration').value),
-    price: parseInt(document.getElementById('servicePrice').value),
-    description: document.getElementById('serviceDescription').value,
-    active: document.getElementById('serviceActive').value === 'true'
+    serviceType: document.getElementById('serviceName').value.trim(),
+    basePrice: parseInt(document.getElementById('servicePrice').value, 10) || 0
   };
-  let services = getServices();
-  services = id ? services.map(s => s.id === id ? { ...s, ...data } : s) : [...services, data];
-  saveToStorage('services', services);
+  if (!data.serviceType) {
+    showToast('Nhập tên dịch vụ (service_type).');
+    return;
+  }
+  let catalog = getServiceCatalog();
+  if (index !== '') catalog[Number(index)] = data;
+  else catalog.push(data);
+  saveToStorage('serviceCatalog', catalog);
   closeModal('serviceModal');
-  showToast('Lưu dịch vụ thành công!');
+  showToast('Lưu loại dịch vụ thành công!');
   location.reload();
 }
 
-function editService(id) {
-  const s = getServices().find(x => x.id === id);
+function editService(index) {
+  const s = getServiceCatalog()[index];
   if (!s) return;
-  document.getElementById('serviceId').value = s.id;
-  document.getElementById('serviceName').value = s.name;
-  document.getElementById('serviceVehicleType').value = s.vehicleType;
-  document.getElementById('serviceDuration').value = s.duration;
-  document.getElementById('servicePrice').value = s.price;
-  document.getElementById('serviceDescription').value = s.description;
-  document.getElementById('serviceActive').value = s.active ? 'true' : 'false';
+  document.getElementById('serviceId').value = index;
+  document.getElementById('serviceName').value = s.serviceType;
+  document.getElementById('servicePrice').value = s.basePrice;
   openModal('serviceModal');
 }
 
-function deleteService(id) {
-  if (!confirm('Xóa dịch vụ này?')) return;
-  saveToStorage('services', getServices().filter(s => s.id !== id));
+function deleteService(index) {
+  if (!confirm('Xóa loại dịch vụ này?')) return;
+  const catalog = getServiceCatalog().filter((_, i) => i !== Number(index));
+  saveToStorage('serviceCatalog', catalog);
   location.reload();
 }
 
@@ -592,21 +669,25 @@ function openAddService() {
 function savePromotion(e) {
   e.preventDefault();
   const id = document.getElementById('promoId').value;
+  const minTierRaw = document.getElementById('promoTier').value;
   const data = {
-    id: id || 'promo-' + Date.now(),
-    name: document.getElementById('promoName').value,
-    description: document.getElementById('promoDescription').value,
-    discountType: document.getElementById('promoDiscountType').value,
-    discountValue: parseFloat(document.getElementById('promoDiscountValue').value),
+    promotionId: id ? Number(id) : null,
+    title: document.getElementById('promoName').value.trim(),
+    description: document.getElementById('promoDescription').value.trim(),
+    discountPercent: parseFloat(document.getElementById('promoDiscountValue').value) || 0,
     startDate: document.getElementById('promoStart').value,
     endDate: document.getElementById('promoEnd').value,
-    targetTier: document.getElementById('promoTier').value,
-    usageLimit: parseInt(document.getElementById('promoLimit').value),
-    usedCount: 0,
-    status: document.getElementById('promoStatus').value
+    minTierId: minTierRaw === 'all' ? null : Number(minTierRaw),
+    status: document.getElementById('promoStatus').value,
+    createdByAdminId: 1
   };
   let promos = getPromotions();
-  promos = id ? promos.map(p => p.id === id ? { ...p, ...data } : p) : [...promos, data];
+  if (id) {
+    promos = promos.map(p => Number(p.promotionId) === Number(id) ? { ...p, ...data, promotionId: Number(id) } : p);
+  } else {
+    data.promotionId = promos.reduce((m, p) => Math.max(m, Number(p.promotionId) || 0), 0) + 1;
+    promos = [...promos, data];
+  }
   saveToStorage('promotions', promos);
   closeModal('promotionModal');
   showToast('Lưu khuyến mãi thành công!');
@@ -614,24 +695,22 @@ function savePromotion(e) {
 }
 
 function editPromotion(id) {
-  const p = getPromotions().find(x => x.id === id);
+  const p = getPromotions().find(x => Number(x.promotionId) === Number(id));
   if (!p) return;
-  document.getElementById('promoId').value = p.id;
-  document.getElementById('promoName').value = p.name;
-  document.getElementById('promoDescription').value = p.description;
-  document.getElementById('promoDiscountType').value = p.discountType;
-  document.getElementById('promoDiscountValue').value = p.discountValue;
+  document.getElementById('promoId').value = p.promotionId;
+  document.getElementById('promoName').value = p.title;
+  document.getElementById('promoDescription').value = p.description || '';
+  document.getElementById('promoDiscountValue').value = p.discountPercent;
   document.getElementById('promoStart').value = p.startDate;
   document.getElementById('promoEnd').value = p.endDate;
-  document.getElementById('promoTier').value = p.targetTier;
-  document.getElementById('promoLimit').value = p.usageLimit;
-  document.getElementById('promoStatus').value = p.status;
+  document.getElementById('promoTier').value = p.minTierId == null ? 'all' : String(p.minTierId);
+  document.getElementById('promoStatus').value = p.status === 'Inactive' || normalizeStatus(p.status) === 'inactive' ? 'Inactive' : 'Active';
   openModal('promotionModal');
 }
 
 function deletePromotion(id) {
   if (!confirm('Xóa khuyến mãi?')) return;
-  saveToStorage('promotions', getPromotions().filter(p => p.id !== id));
+  saveToStorage('promotions', getPromotions().filter(p => Number(p.promotionId) !== Number(id)));
   location.reload();
 }
 
@@ -648,10 +727,9 @@ async function saveReward(e) {
   const rewardId = document.getElementById('rewardId').value;
   const payload = buildRewardRequest({
     rewardName: document.getElementById('rewardName').value.trim(),
-    description: document.getElementById('rewardDescription').value.trim(),
     pointsRequired: document.getElementById('rewardPoints').value,
     discountAmount: document.getElementById('rewardDiscount').value,
-    stockQuantity: document.getElementById('rewardStock').value,
+    freeWash: document.getElementById('rewardFreeWash').value,
     isActive: document.getElementById('rewardActive').value
   });
 
@@ -660,16 +738,21 @@ async function saveReward(e) {
     return;
   }
 
-  if (!window.AutoWashAPI) {
-    showToast('API chưa sẵn sàng.');
-    return;
-  }
-
   try {
-    if (rewardId) {
-      await window.AutoWashAPI.rewards.update(Number(rewardId), payload);
+    if (window.AutoWashAPI && usesRealApi()) {
+      if (rewardId) await window.AutoWashAPI.rewards.update(Number(rewardId), payload);
+      else await window.AutoWashAPI.rewards.create(payload);
     } else {
-      await window.AutoWashAPI.rewards.create(payload);
+      let catalog = getRewardCatalog();
+      if (rewardId) {
+        catalog = catalog.map(r => Number(r.rewardId) === Number(rewardId)
+          ? { ...r, ...payload, rewardId: Number(rewardId), createdByAdminId: r.createdByAdminId || 1 }
+          : r);
+      } else {
+        const nextId = catalog.reduce((m, r) => Math.max(m, Number(r.rewardId) || 0), 0) + 1;
+        catalog.push({ rewardId: nextId, ...payload, createdByAdminId: 1 });
+      }
+      saveToStorage('rewardCatalog', catalog);
     }
     closeModal('rewardModal');
     showToast(rewardId ? 'Cập nhật quà tặng thành công!' : 'Thêm quà tặng thành công!');
@@ -696,10 +779,9 @@ async function editReward(id) {
   document.getElementById('rewardModalTitle').textContent = 'Sửa quà tặng';
   document.getElementById('rewardId').value = reward.rewardId;
   document.getElementById('rewardName').value = reward.rewardName;
-  document.getElementById('rewardDescription').value = reward.description || '';
   document.getElementById('rewardPoints').value = reward.pointsRequired;
   document.getElementById('rewardDiscount').value = reward.discountAmount;
-  document.getElementById('rewardStock').value = reward.stockQuantity;
+  document.getElementById('rewardFreeWash').value = reward.freeWash ? 'true' : 'false';
   document.getElementById('rewardActive').value = reward.isActive ? 'true' : 'false';
   openModal('rewardModal');
 }
@@ -708,13 +790,15 @@ async function deleteReward(id) {
   if (!requireAuth(['admin'])) return;
   if (!confirm('Bạn có chắc muốn vô hiệu hóa quà tặng này?')) return;
 
-  if (!window.AutoWashAPI) {
-    showToast('API chưa sẵn sàng.');
-    return;
-  }
-
   try {
-    await window.AutoWashAPI.rewards.delete(Number(id));
+    if (window.AutoWashAPI && usesRealApi()) {
+      await window.AutoWashAPI.rewards.delete(Number(id));
+    } else {
+      const catalog = getRewardCatalog().map(r =>
+        Number(r.rewardId) === Number(id) ? { ...r, isActive: false } : r
+      );
+      saveToStorage('rewardCatalog', catalog);
+    }
     showToast('Đã vô hiệu hóa quà tặng.');
     await renderAdminRewards();
   } catch (error) {
@@ -727,5 +811,6 @@ function openAddReward() {
   document.getElementById('rewardId').value = '';
   document.getElementById('rewardModalTitle').textContent = 'Thêm quà tặng';
   document.getElementById('rewardActive').value = 'true';
+  document.getElementById('rewardFreeWash').value = 'false';
   openModal('rewardModal');
 }

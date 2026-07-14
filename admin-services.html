@@ -26,16 +26,13 @@
       </div>
     </header>
     <div class="page-content">
-<div class="page-header"><h2>Dịch vụ</h2><button class="btn btn-primary" onclick="openAddService()">+ Thêm dịch vụ</button></div>
-<div class="card table-wrapper"><table class="table" id="servicesTable"><thead><tr><th>Tên</th><th>Loại xe</th><th>TG</th><th>Giá</th><th>Mô tả</th><th>TT</th><th></th></tr></thead><tbody></tbody></table></div>
-<div class="modal-overlay" id="serviceModal"><div class="modal"><div class="modal-header"><h3>Dịch vụ</h3><button class="modal-close" data-modal-close="serviceModal">&times;</button></div>
+<div class="page-header"><h2>Loại dịch vụ (service_type)</h2><button class="btn btn-primary" onclick="openAddService()">+ Thêm loại</button></div>
+<p class="text-muted" style="margin-bottom:1rem">DB không có bảng WashService — đây là danh mục chuỗi <code>Booking.service_type</code> + giá tham chiếu cho UI.</p>
+<div class="card table-wrapper"><table class="table" id="servicesTable"><thead><tr><th>service_type</th><th>Giá tham chiếu</th><th>Ghi chú</th><th></th></tr></thead><tbody></tbody></table></div>
+<div class="modal-overlay" id="serviceModal"><div class="modal"><div class="modal-header"><h3>Loại dịch vụ</h3><button class="modal-close" data-modal-close="serviceModal">&times;</button></div>
 <form id="serviceForm"><div class="modal-body"><input type="hidden" id="serviceId">
-<div class="form-group"><label>Tên</label><input id="serviceName" required></div>
-<div class="form-row"><div class="form-group"><label>Loại xe</label><select id="serviceVehicleType"><option>Car</option><option>Motorbike</option></select></div>
-<div class="form-group"><label>Thời lượng (phút)</label><input type="number" id="serviceDuration" required></div></div>
-<div class="form-group"><label>Giá</label><input type="number" id="servicePrice" required></div>
-<div class="form-group"><label>Mô tả</label><textarea id="serviceDescription"></textarea></div>
-<div class="form-group"><label>Trạng thái</label><select id="serviceActive"><option value="true">Active</option><option value="false">Inactive</option></select></div>
+<div class="form-group"><label>Tên dịch vụ (service_type)</label><input id="serviceName" required></div>
+<div class="form-group"><label>Giá tham chiếu (đ)</label><input type="number" id="servicePrice" required></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-modal-close="serviceModal">Hủy</button><button type="submit" class="btn btn-primary">Lưu</button></div></form></div></div>
 </div>
   </main>

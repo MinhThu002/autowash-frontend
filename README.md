@@ -64,8 +64,10 @@ backend). Dữ liệu mẫu được nạp từ `assets/js/mock-data.js` và lư
 | Admin      | email chứa `admin`      | `admin-dashboard.html`    |
 | Staff      | email chứa `staff`      | `staff-schedule.html`     |
 
-Tài khoản demo gợi ý (mật khẩu bất kỳ):
-`customer@mail.com`, `admin@mail.com`, `staff@mail.com`.
+Tài khoản demo gợi ý (mật khẩu bất kỳ khi mock):
+- Customer: `vana@gmail.com` (hoặc `thib@gmail.com`)
+- Admin: `admin` (Manager)
+- Staff: `staff1`
 
 ## Tính năng chính
 
@@ -87,12 +89,14 @@ Tài khoản demo gợi ý (mật khẩu bất kỳ):
 
 ## Hạng thành viên (mock)
 
-| Hạng     | Lượt rửa | Chi tiêu | Pt rate | Cửa sổ đặt | Giảm |
-| -------- | -------- | -------- | ------- | ---------- | ---- |
-| Member   | 0        | 0đ       | 1.0x    | 7 ngày     | 0%   |
-| Silver   | 5        | 500K     | 1.2x    | 10 ngày    | 5%   |
-| Gold     | 15       | 2M       | 1.5x    | 12 ngày    | 10%  |
-| Platinum | 30       | 5M       | 2.0x    | 14 ngày    | 15%  |
+| Hạng     | Lượt rửa | Chi tiêu | Pt rate | Cửa sổ đặt | Priority |
+| -------- | -------- | -------- | ------- | ---------- | -------- |
+| Member   | 0        | 0đ       | 1.0x    | 7 ngày     | 1        |
+| Silver   | 10       | 2M       | 1.2x    | 10 ngày    | 2        |
+| Gold     | 20       | 5M       | 1.5x    | 12 ngày    | 3        |
+| Platinum | 40       | 10M      | 2.0x    | 14 ngày    | 4        |
+
+Giảm giá/quyền lợi lấy từ bảng **Perk** + **TierPerk** (không gắn trực tiếp trên LoyaltyTier).
 
 ## Cách chạy
 
@@ -129,7 +133,7 @@ Script sẽ ghi đè các file HTML tương ứng trong thư mục gốc.
 
 ## Reset dữ liệu
 
-Mock data được nạp vào `localStorage` lần đầu (`autowash_initialized`). Để
+Mock data được nạp vào `localStorage` lần đầu (`autowash_schema_version = db-v2`). Để
 nạp lại từ đầu, mở DevTools console và chạy:
 
 ```js

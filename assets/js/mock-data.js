@@ -1,117 +1,210 @@
-/* AutoWash Pro - Mock Data */
+/* AutoWash Pro - Mock Data (aligned with WashPRo.sql / AutoWashPro DB) */
+const STORAGE_SCHEMA_VERSION = 'db-v2';
+
 const MOCK_DATA = {
-  currentCustomerId: 'cust-001',
+  currentCustomerId: 1,
 
+  /* LoyaltyTier */
   loyaltyTiers: [
-    { id: 'member', name: 'Member', requiredVisits: 0, requiredSpending: 0, pointRate: 1, bookingWindow: 7, discountPercent: 0, benefits: ['Đặt lịch trước 7 ngày', 'Tích điểm cơ bản'] },
-    { id: 'silver', name: 'Silver', requiredVisits: 5, requiredSpending: 500000, pointRate: 1.2, bookingWindow: 10, discountPercent: 5, benefits: ['Giảm 5%', 'Đặt lịch 10 ngày', 'Ưu tiên xếp hàng nhẹ'] },
-    { id: 'gold', name: 'Gold', requiredVisits: 15, requiredSpending: 2000000, pointRate: 1.5, bookingWindow: 12, discountPercent: 10, benefits: ['Giảm 10%', 'Đặt lịch 12 ngày', 'Quà sinh nhật'] },
-    { id: 'platinum', name: 'Platinum', requiredVisits: 30, requiredSpending: 5000000, pointRate: 2, bookingWindow: 14, discountPercent: 15, benefits: ['Giảm 15%', 'Đặt lịch 14 ngày', 'Dịch vụ VIP', 'Tặng 1 lần rửa/tháng'] }
+    { tierId: 1, tierName: 'Member', minSpending: 0, minVisits: 0, bookingWindowDays: 7, pointMultiplier: 1.0, priorityLevel: 1 },
+    { tierId: 2, tierName: 'Silver', minSpending: 2000000, minVisits: 10, bookingWindowDays: 10, pointMultiplier: 1.2, priorityLevel: 2 },
+    { tierId: 3, tierName: 'Gold', minSpending: 5000000, minVisits: 20, bookingWindowDays: 12, pointMultiplier: 1.5, priorityLevel: 3 },
+    { tierId: 4, tierName: 'Platinum', minSpending: 10000000, minVisits: 40, bookingWindowDays: 14, pointMultiplier: 2.0, priorityLevel: 4 }
   ],
 
+  /* Perk */
+  perks: [
+    { perkId: 1, perkName: 'Giảm giá 5%', discountPercent: 5, freeService: null, addOnItem: null },
+    { perkId: 2, perkName: 'Sáp miễn phí', discountPercent: 0, freeService: 'Sáp bóng', addOnItem: null },
+    { perkId: 3, perkName: 'Tặng vệ sinh nội thất', discountPercent: 0, freeService: null, addOnItem: 'Vệ sinh nội thất' }
+  ],
+
+  /* TierPerk */
+  tierPerks: [
+    { tierId: 2, perkId: 1 },
+    { tierId: 3, perkId: 1 }, { tierId: 3, perkId: 2 },
+    { tierId: 4, perkId: 1 }, { tierId: 4, perkId: 2 }, { tierId: 4, perkId: 3 }
+  ],
+
+  /* AdminAccount */
+  adminAccounts: [
+    { adminId: 1, fullName: 'Quản trị viên chính', username: 'admin', password: '123456', role: 'Manager' },
+    { adminId: 2, fullName: 'Nhân viên CSKH', username: 'staff1', password: '123456', role: 'Staff' }
+  ],
+
+  /* Customer — sample from WashPRo.sql + extras for UI */
   customers: [
-    { id: 'cust-001', name: 'Minh Thư 1', phone: '0901234567', email: 'an.nguyen@email.com', tier: 'gold', points: 2450, totalVisits: 18, totalSpending: 3200000, status: 'active' },
-    { id: 'cust-002', name: 'Minh Thư 2', phone: '0912345678', email: 'binh.tran@email.com', tier: 'silver', points: 890, totalVisits: 7, totalSpending: 980000, status: 'active' },
-    { id: 'cust-003', name: 'Minh Thư 3', phone: '0923456789', email: 'cuong.le@email.com', tier: 'platinum', points: 5200, totalVisits: 42, totalSpending: 8500000, status: 'active' },
-    { id: 'cust-004', name: 'Minh Thư 4', phone: '0934567890', email: 'dung.pham@email.com', tier: 'member', points: 120, totalVisits: 2, totalSpending: 350000, status: 'active' },
-    { id: 'cust-005', name: 'Minh Thư 5', phone: '0945678901', email: 'em.hoang@email.com', tier: 'gold', points: 1800, totalVisits: 14, totalSpending: 2100000, status: 'inactive' }
+    { customerId: 1, fullName: 'Nguyễn Văn A', phoneNumber: '0901234567', email: 'vana@gmail.com', tierId: 1, currentPoints: 100, totalSpend: 120000, totalVisits: 1, lastTierReview: null, tierUpdatedByAdminId: null, createdAt: '2026-05-01T08:00:00' },
+    { customerId: 2, fullName: 'Trần Thị B', phoneNumber: '0912345678', email: 'thib@gmail.com', tierId: 2, currentPoints: 500, totalSpend: 200000, totalVisits: 1, lastTierReview: null, tierUpdatedByAdminId: null, createdAt: '2026-05-01T09:00:00' },
+    { customerId: 3, fullName: 'Lê Minh C', phoneNumber: '0923456789', email: 'minhc@gmail.com', tierId: 3, currentPoints: 1800, totalSpend: 5200000, totalVisits: 22, lastTierReview: '2026-04-01', tierUpdatedByAdminId: null, createdAt: '2026-01-15T10:00:00' },
+    { customerId: 4, fullName: 'Phạm Thu D', phoneNumber: '0934567890', email: 'thud@gmail.com', tierId: 4, currentPoints: 4200, totalSpend: 12500000, totalVisits: 45, lastTierReview: '2026-04-01', tierUpdatedByAdminId: 1, createdAt: '2025-11-20T11:00:00' }
   ],
 
+  /* Vehicle */
   vehicles: [
-    { id: 'veh-001', vehicleId: 1, customerId: 'cust-001', licensePlate: '51A-12345', vehicleType: 'Car', brand: 'Toyota Camry', color: 'Trắng', notes: 'Xe gia đình', isActive: true },
-    { id: 'veh-002', vehicleId: 2, customerId: 'cust-001', licensePlate: '59-H1 6789', vehicleType: 'Motorbike', brand: 'Honda Vision', color: 'Đỏ', notes: '', isActive: true },
-    { id: 'veh-003', vehicleId: 3, customerId: 'cust-002', licensePlate: '30F-98765', vehicleType: 'Car', brand: 'Hyundai Tucson', color: 'Xám', notes: '', isActive: true }
+    { vehicleId: 1, customerId: 1, licensePlate: '59A-12345', vehicleType: 'Motorbike', brand: 'Honda', color: 'Black' },
+    { vehicleId: 2, customerId: 2, licensePlate: '61B-67890', vehicleType: 'Motorbike', brand: 'Yamaha', color: 'Red' },
+    { vehicleId: 3, customerId: 3, licensePlate: '51A-88888', vehicleType: 'Car', brand: 'Toyota', color: 'White' },
+    { vehicleId: 4, customerId: 4, licensePlate: '30F-99999', vehicleType: 'Car', brand: 'Mercedes', color: 'Silver' }
   ],
 
-  services: [
-    { id: 'svc-001', name: 'Rửa nhanh', vehicleType: 'Motorbike', duration: 15, price: 50000, description: 'Rửa ngoài cơ bản', active: true },
-    { id: 'svc-002', name: 'Rửa tiêu chuẩn', vehicleType: 'Motorbike', duration: 25, price: 80000, description: 'Rửa ngoài + lau khô', active: true },
-    { id: 'svc-003', name: 'Rửa nhanh', vehicleType: 'Car', duration: 20, price: 120000, description: 'Rửa ngoài cơ bản', active: true },
-    { id: 'svc-004', name: 'Rửa tiêu chuẩn', vehicleType: 'Car', duration: 35, price: 180000, description: 'Rửa ngoài + hút bụi', active: true },
-    { id: 'svc-005', name: 'Rửa cao cấp', vehicleType: 'Car', duration: 60, price: 350000, description: 'Rửa full + wax', active: true },
-    { id: 'svc-006', name: 'Detailing', vehicleType: 'Car', duration: 120, price: 800000, description: 'Chăm sóc toàn diện', active: true },
-    { id: 'svc-007', name: 'Rửa cũ', vehicleType: 'Car', duration: 30, price: 100000, description: 'Ngừng dịch vụ', active: false }
+  /**
+   * Danh mục service_type cho UI (DB không có bảng WashService).
+   * Booking.service_type lưu chuỗi tên dịch vụ.
+   */
+  serviceCatalog: [
+    { serviceType: 'Rửa nhanh', basePrice: 80000 },
+    { serviceType: 'Rửa tiêu chuẩn', basePrice: 120000 },
+    { serviceType: 'Rửa cao cấp', basePrice: 200000 },
+    { serviceType: 'Rửa toàn diện', basePrice: 250000 }
   ],
 
+  /* Booking — status theo sample DB: Pending, Confirmed, ... */
   bookings: [
-    { id: 'BK-2026-001', customerId: 'cust-001', customerName: 'Minh Thư 1', vehicleId: 'veh-001', vehiclePlate: '51A-12345', serviceId: 'svc-004', serviceName: 'Rửa tiêu chuẩn', date: '2026-05-22', time: '09:00', status: 'confirmed', totalPrice: 162000, pointsEarned: 180, promotionId: null },
-    { id: 'BK-2026-002', customerId: 'cust-001', customerName: 'Minh Thư 1', vehicleId: 'veh-002', vehiclePlate: '59-H1 6789', serviceId: 'svc-002', serviceName: 'Rửa tiêu chuẩn', date: '2026-05-15', time: '14:30', status: 'completed', totalPrice: 72000, pointsEarned: 96 },
-    { id: 'BK-2026-003', customerId: 'cust-002', customerName: 'Minh Thư 2', vehicleId: 'veh-003', vehiclePlate: '30F-98765', serviceId: 'svc-003', serviceName: 'Rửa nhanh', date: '2026-05-20', time: '10:00', status: 'pending', totalPrice: 114000, pointsEarned: 0 },
-    { id: 'BK-2026-004', customerId: 'cust-003', customerName: 'Minh Thư 3', vehicleId: 'veh-001', vehiclePlate: '51A-99999', serviceId: 'svc-005', serviceName: 'Rửa cao cấp', date: '2026-05-19', time: '08:00', status: 'in_progress', totalPrice: 297500, pointsEarned: 0 },
-    { id: 'BK-2026-005', customerId: 'cust-001', customerName: 'Minh Thư 1', vehicleId: 'veh-001', vehiclePlate: '51A-12345', serviceId: 'svc-003', serviceName: 'Rửa nhanh', date: '2026-05-10', time: '11:00', status: 'completed', totalPrice: 108000, pointsEarned: 120 },
-    { id: 'BK-2026-006', customerId: 'cust-004', customerName: 'Minh Thư 4', vehicleId: 'veh-003', vehiclePlate: '30F-11111', serviceId: 'svc-004', serviceName: 'Rửa tiêu chuẩn', date: '2026-05-18', time: '15:00', status: 'cancelled', totalPrice: 180000, pointsEarned: 0 }
+    { bookingId: 1, vehicleId: 1, bookingDate: '2026-05-20', bookingTime: '09:00', serviceType: 'Rửa cao cấp', status: 'Pending', priorityLevel: 1, tierIdAtBooking: 1, cancelledByAdminId: null, createdAt: '2026-05-18T10:00:00' },
+    { bookingId: 2, vehicleId: 2, bookingDate: '2026-05-20', bookingTime: '10:00', serviceType: 'Rửa toàn diện', status: 'Confirmed', priorityLevel: 2, tierIdAtBooking: 2, cancelledByAdminId: null, createdAt: '2026-05-18T11:00:00' },
+    { bookingId: 3, vehicleId: 3, bookingDate: '2026-05-22', bookingTime: '14:00', serviceType: 'Rửa tiêu chuẩn', status: 'Confirmed', priorityLevel: 3, tierIdAtBooking: 3, cancelledByAdminId: null, createdAt: '2026-05-19T09:00:00' },
+    { bookingId: 4, vehicleId: 1, bookingDate: '2026-05-10', bookingTime: '11:00', serviceType: 'Rửa nhanh', status: 'Completed', priorityLevel: 1, tierIdAtBooking: 1, cancelledByAdminId: null, createdAt: '2026-05-08T08:00:00' },
+    { bookingId: 5, vehicleId: 4, bookingDate: '2026-05-19', bookingTime: '08:00', serviceType: 'Rửa cao cấp', status: 'Completed', priorityLevel: 4, tierIdAtBooking: 4, cancelledByAdminId: null, createdAt: '2026-05-17T07:00:00' },
+    { bookingId: 6, vehicleId: 3, bookingDate: '2026-05-18', bookingTime: '15:00', serviceType: 'Rửa tiêu chuẩn', status: 'Cancelled', priorityLevel: 3, tierIdAtBooking: 3, cancelledByAdminId: 1, createdAt: '2026-05-16T12:00:00' }
   ],
 
+  /* WashHistory — money/points live here, not on Booking */
+  washHistory: [
+    { washId: 1, bookingId: 4, washDate: '2026-05-10T11:30:00', amountPaid: 80000, pointsEarned: 12, pointsUsed: 0, perkApplied: 'Không' },
+    { washId: 2, bookingId: 5, washDate: '2026-05-19T09:00:00', amountPaid: 170000, pointsEarned: 20, pointsUsed: 50, perkApplied: 'Giảm 5% (Silver)' },
+    { washId: 3, bookingId: 1, washDate: '2026-05-20T09:45:00', amountPaid: 120000, pointsEarned: 12, pointsUsed: 0, perkApplied: 'Không' },
+    { washId: 4, bookingId: 2, washDate: '2026-05-20T10:50:00', amountPaid: 200000, pointsEarned: 20, pointsUsed: 50, perkApplied: 'Giảm 5% (Silver)' }
+  ],
+
+  /* LoyaltyPoint */
+  loyaltyPoints: [
+    { pointId: 1, customerId: 1, washId: 1, pointsChange: 12, transactionType: 'Earn', expiryDate: '2027-05-20', createdAt: '2026-05-10T11:35:00' },
+    { pointId: 2, customerId: 2, washId: 2, pointsChange: -50, transactionType: 'Redeem', expiryDate: null, createdAt: '2026-05-19T09:05:00' },
+    { pointId: 3, customerId: 1, washId: 3, pointsChange: 12, transactionType: 'Earn', expiryDate: '2027-05-20', createdAt: '2026-05-20T09:50:00' },
+    { pointId: 4, customerId: 2, washId: 4, pointsChange: 20, transactionType: 'Earn', expiryDate: '2027-05-20', createdAt: '2026-05-20T10:55:00' },
+    { pointId: 5, customerId: 2, washId: null, pointsChange: -100, transactionType: 'Redeem', expiryDate: null, createdAt: '2026-05-15T16:00:00' }
+  ],
+
+  /* Promotion — only discount_percent in DB */
   promotions: [
-    { id: 'promo-001', name: 'Chào hè 2026', description: 'Giảm giá mùa hè cho tất cả dịch vụ ô tô', discountType: 'percent', discountValue: 15, startDate: '2026-05-01', endDate: '2026-08-31', targetTier: 'all', usageLimit: 500, usedCount: 128, status: 'active' },
-    { id: 'promo-002', name: 'Gold Member Exclusive', description: 'Giảm thêm cho hạng Gold trở lên', discountType: 'percent', discountValue: 10, startDate: '2026-04-01', endDate: '2026-12-31', targetTier: 'gold', usageLimit: 200, usedCount: 45, status: 'active' },
-    { id: 'promo-003', name: 'Xe máy cuối tuần', description: 'Giảm 20k cho rửa xe máy T7-CN', discountType: 'fixed', discountValue: 20000, startDate: '2026-05-01', endDate: '2026-06-30', targetTier: 'all', usageLimit: 1000, usedCount: 312, status: 'active' },
-    { id: 'promo-004', name: 'Platinum VIP', description: 'Miễn phí wax nhẹ', discountType: 'fixed', discountValue: 50000, startDate: '2026-01-01', endDate: '2026-12-31', targetTier: 'platinum', usageLimit: 50, usedCount: 12, status: 'active' },
-    { id: 'promo-005', name: 'Tết 2025', description: 'Khuyến mãi đã kết thúc', discountType: 'percent', discountValue: 20, startDate: '2025-01-01', endDate: '2025-02-15', targetTier: 'all', usageLimit: 300, usedCount: 300, status: 'inactive' }
+    { promotionId: 1, title: 'Ưu đãi tháng 5', description: 'Giảm 10% cho khách Silver trở lên', minTierId: 2, discountPercent: 10, startDate: '2026-05-01', endDate: '2026-05-31', status: 'Active', createdByAdminId: 1 },
+    { promotionId: 2, title: 'Khách mới', description: 'Giảm 5% cho mọi hạng', minTierId: null, discountPercent: 5, startDate: '2026-05-01', endDate: '2026-08-31', status: 'Active', createdByAdminId: 1 },
+    { promotionId: 3, title: 'Tết 2025', description: 'Khuyến mãi đã kết thúc', minTierId: null, discountPercent: 20, startDate: '2025-01-01', endDate: '2025-02-15', status: 'Inactive', createdByAdminId: 1 }
   ],
 
-  loyaltyTransactions: [
-    { id: 'lt-001', customerId: 'cust-001', type: 'earn', description: 'Booking BK-2026-002', points: 96, date: '2026-05-15' },
-    { id: 'lt-002', customerId: 'cust-001', type: 'earn', description: 'Booking BK-2026-005', points: 120, date: '2026-05-10' },
-    { id: 'lt-003', customerId: 'cust-001', type: 'redeem', description: 'Đổi voucher giảm 50k', points: -500, date: '2026-05-08' },
-    { id: 'lt-004', customerId: 'cust-001', type: 'bonus', description: 'Thưởng hạng Gold', points: 200, date: '2026-04-01' },
-    { id: 'lt-005', customerId: 'cust-001', type: 'earn', description: 'Booking BK-2026-001 (dự kiến)', points: 180, date: '2026-05-22' }
-  ],
-
-  rewards: [
-    { id: 'rw-001', name: 'Voucher giảm 50.000đ', pointsCost: 500, description: 'Áp dụng 1 lần cho bất kỳ dịch vụ' },
-    { id: 'rw-002', name: 'Rửa nhanh miễn phí (xe máy)', pointsCost: 800, description: 'Miễn phí 1 lần rửa nhanh xe máy' },
-    { id: 'rw-003', name: 'Nâng cấp rửa cao cấp', pointsCost: 1500, description: 'Giảm 100% phí chênh lệch lên cao cấp' }
-  ],
-
+  /* RewardCatalog */
   rewardCatalog: [
-    { rewardId: 1, rewardName: 'Voucher giảm 50.000đ', description: 'Áp dụng 1 lần cho bất kỳ dịch vụ', pointsRequired: 500, discountAmount: 50000, stockQuantity: 100, isActive: true },
-    { rewardId: 2, rewardName: 'Rửa nhanh miễn phí (xe máy)', description: 'Miễn phí 1 lần rửa nhanh xe máy', pointsRequired: 800, discountAmount: 80000, stockQuantity: 50, isActive: true },
-    { rewardId: 3, rewardName: 'Nâng cấp rửa cao cấp', description: 'Giảm 100% phí chênh lệch lên cao cấp', pointsRequired: 1500, discountAmount: 200000, stockQuantity: 20, isActive: true },
-    { rewardId: 4, rewardName: 'Voucher cũ (ngừng)', description: 'Quà đã ngừng phát hành', pointsRequired: 300, discountAmount: 30000, stockQuantity: 0, isActive: false }
+    { rewardId: 1, rewardName: 'Giảm 10.000đ', pointsRequired: 100, discountAmount: 10000, freeWash: false, isActive: true, createdByAdminId: 1 },
+    { rewardId: 2, rewardName: 'Rửa xe miễn phí', pointsRequired: 300, discountAmount: 0, freeWash: true, isActive: true, createdByAdminId: 1 },
+    { rewardId: 3, rewardName: 'Giảm 50.000đ', pointsRequired: 500, discountAmount: 50000, freeWash: false, isActive: true, createdByAdminId: 1 },
+    { rewardId: 4, rewardName: 'Quà ngừng phát hành', pointsRequired: 200, discountAmount: 20000, freeWash: false, isActive: false, createdByAdminId: 1 }
   ],
 
-  timeSlots: ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30'],
+  /* RewardRedemption */
+  rewardRedemptions: [
+    { redemptionId: 1, customerId: 2, rewardId: 1, pointsUsed: 100, redemptionDate: '2026-05-15T16:00:00' }
+  ],
+
+  /* CustomerMonthlyStats */
+  customerMonthlyStats: [
+    { statsId: 1, customerId: 1, yearMonth: '202605', monthlySpend: 200000, monthlyVisits: 2 },
+    { statsId: 2, customerId: 2, yearMonth: '202605', monthlySpend: 400000, monthlyVisits: 2 },
+    { statsId: 3, customerId: 3, yearMonth: '202605', monthlySpend: 800000, monthlyVisits: 4 },
+    { statsId: 4, customerId: 4, yearMonth: '202605', monthlySpend: 1200000, monthlyVisits: 5 }
+  ],
+
+  /* UI-only: khung giờ chọn trên form (không phải bảng TimeSlot) */
+  bookingTimeOptions: ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30'],
 
   analyticsData: {
-    totalBookings: 1247,
-    todayBookings: 23,
-    totalRevenue: 458200000,
-    newCustomers: 34,
-    repeatCustomers: 189,
-    activePromotions: 4,
-    customersByTier: { member: 120, silver: 85, gold: 42, platinum: 12 },
-    monthlyRevenue: [32000000, 35000000, 38000000, 42000000, 45000000, 48000000, 52000000, 49000000, 51000000, 54000000, 56000000, 58000000],
-    bookingTrend: [45, 52, 48, 61, 55, 67, 72, 68, 75, 80, 78, 85],
-    rewardUsageRate: 34,
+    totalBookings: 6,
+    todayBookings: 2,
+    totalRevenue: 570000,
+    newCustomers: 2,
+    repeatCustomers: 2,
+    activePromotions: 2,
+    customersByTier: { member: 1, silver: 1, gold: 1, platinum: 1 },
+    monthlyRevenue: [80000, 120000, 90000, 150000, 200000, 170000],
+    bookingTrend: [2, 3, 2, 4, 5, 6],
+    rewardUsageRate: 25,
     topLoyalCustomers: [
-      { name: 'Minh Thư 3', visits: 42, spending: 8500000 },
-      { name: 'Minh Thư 1', visits: 18, spending: 3200000 },
-      { name: 'Minh Thư 5', visits: 14, spending: 2100000 }
+      { name: 'Phạm Thu D', visits: 45, spending: 12500000 },
+      { name: 'Lê Minh C', visits: 22, spending: 5200000 },
+      { name: 'Trần Thị B', visits: 1, spending: 200000 }
     ],
     topServices: [
-      { name: 'Rửa tiêu chuẩn (Car)', count: 412 },
-      { name: 'Rửa nhanh (Car)', count: 298 },
-      { name: 'Rửa tiêu chuẩn (Motorbike)', count: 256 },
-      { name: 'Rửa cao cấp', count: 145 }
+      { name: 'Rửa cao cấp', count: 2 },
+      { name: 'Rửa tiêu chuẩn', count: 2 },
+      { name: 'Rửa toàn diện', count: 1 },
+      { name: 'Rửa nhanh', count: 1 }
     ]
-  },
-
-  staffSchedule: [
-    { id: 'ss-001', time: '08:00', customerId: 'cust-003', customerName: 'Minh Thư 3', vehicle: 'Mercedes C200', licensePlate: '51A-99999', service: 'Rửa cao cấp', status: 'in_progress' },
-    { id: 'ss-002', time: '09:00', customerId: 'cust-001', customerName: 'Minh Thư 1', vehicle: 'Toyota Camry', licensePlate: '51A-12345', service: 'Rửa tiêu chuẩn', status: 'confirmed' },
-    { id: 'ss-003', time: '10:00', customerId: 'cust-002', customerName: 'Minh Thư 2', vehicle: 'Hyundai Tucson', licensePlate: '30F-98765', service: 'Rửa nhanh', status: 'confirmed' },
-    { id: 'ss-004', time: '11:00', customerId: 'cust-004', customerName: 'Minh Thư 4', vehicle: 'Mazda 3', licensePlate: '30F-11111', service: 'Rửa tiêu chuẩn', status: 'pending' },
-    { id: 'ss-005', time: '14:00', customerId: 'cust-001', customerName: 'Minh Thư 1', vehicle: 'Honda Vision', licensePlate: '59-H1 6789', service: 'Rửa tiêu chuẩn', status: 'pending' }
-  ]
+  }
 };
 
-function getTierById(tierId) {
-  return MOCK_DATA.loyaltyTiers.find(t => t.id === tierId) || MOCK_DATA.loyaltyTiers[0];
+/* ---------- Tier helpers ---------- */
+
+function tierKey(tier) {
+  if (tier == null) return 'member';
+  if (typeof tier === 'object') return String(tier.tierName || '').toLowerCase() || 'member';
+  const value = String(tier).toLowerCase();
+  if (/^\d+$/.test(value)) {
+    const found = MOCK_DATA.loyaltyTiers.find(t => t.tierId === Number(value));
+    return found ? found.tierName.toLowerCase() : 'member';
+  }
+  if (value.includes('bronze') || value === 'member') return 'member';
+  if (value.includes('silver')) return 'silver';
+  if (value.includes('gold')) return 'gold';
+  if (value.includes('diamond') || value.includes('platinum')) return 'platinum';
+  return value || 'member';
 }
 
+function getTierById(tierIdOrKey) {
+  if (tierIdOrKey == null) return MOCK_DATA.loyaltyTiers[0];
+  if (typeof tierIdOrKey === 'object') return tierIdOrKey;
+  const n = Number(tierIdOrKey);
+  if (Number.isFinite(n) && n > 0) {
+    return MOCK_DATA.loyaltyTiers.find(t => t.tierId === n) || MOCK_DATA.loyaltyTiers[0];
+  }
+  const key = tierKey(tierIdOrKey);
+  return MOCK_DATA.loyaltyTiers.find(t => t.tierName.toLowerCase() === key) || MOCK_DATA.loyaltyTiers[0];
+}
+
+function getPerksForTier(tierId) {
+  const ids = MOCK_DATA.tierPerks.filter(tp => tp.tierId === Number(tierId)).map(tp => tp.perkId);
+  return MOCK_DATA.perks.filter(p => ids.includes(p.perkId));
+}
+
+function getTierDiscountPercent(tierId) {
+  const perks = getPerksForTier(tierId);
+  return perks.reduce((max, p) => Math.max(max, Number(p.discountPercent) || 0), 0);
+}
+
+function describePerk(perk) {
+  const parts = [];
+  if (perk.discountPercent) parts.push(`Giảm ${perk.discountPercent}%`);
+  if (perk.freeService) parts.push(`Miễn phí: ${perk.freeService}`);
+  if (perk.addOnItem) parts.push(`Tặng: ${perk.addOnItem}`);
+  return parts.length ? parts.join(' • ') : perk.perkName;
+}
+
+function getTierBenefits(tierId) {
+  const tier = getTierById(tierId);
+  const benefits = [
+    `Đặt lịch trước ${tier.bookingWindowDays} ngày`,
+    `Hệ số điểm x${tier.pointMultiplier}`,
+    `Ưu tiên xếp hàng: ${tier.priorityLevel}`
+  ];
+  getPerksForTier(tier.tierId).forEach(p => benefits.push(describePerk(p)));
+  return benefits;
+}
+
+/* ---------- Customer / vehicle ---------- */
+
 function getCustomerById(id) {
-  return MOCK_DATA.customers.find(c => c.id === id);
+  const n = Number(id);
+  const customers = loadFromStorage('customers', MOCK_DATA.customers);
+  return customers.find(c => Number(c.customerId) === n || c.customerId === id);
 }
 
 function getCurrentCustomer() {
@@ -119,23 +212,33 @@ function getCurrentCustomer() {
   if (stored) {
     try {
       const user = JSON.parse(stored);
-      return getCustomerById(user.customerId) || getCustomerById(MOCK_DATA.currentCustomerId);
+      const raw = user.customerId ?? user.id;
+      return getCustomerById(raw) || getCustomerById(MOCK_DATA.currentCustomerId);
     } catch (e) { /* ignore */ }
   }
   return getCustomerById(MOCK_DATA.currentCustomerId);
 }
 
 function formatCurrency(amount) {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
 }
 
 function formatDate(dateStr) {
   if (!dateStr) return '-';
-  const d = new Date(dateStr + 'T00:00:00');
+  const raw = String(dateStr).slice(0, 10);
+  const d = new Date(raw + 'T00:00:00');
   return d.toLocaleDateString('vi-VN');
 }
 
+function normalizeStatus(status) {
+  return String(status || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+}
+
 function getStatusBadge(status) {
+  const key = normalizeStatus(status);
   const map = {
     pending: 'badge-pending',
     confirmed: 'badge-confirmed',
@@ -154,24 +257,20 @@ function getStatusBadge(status) {
     active: 'Hoạt động',
     inactive: 'Ngừng'
   };
-  const cls = map[status] || 'badge-pending';
-  const label = labels[status] || status;
+  const cls = map[key] || 'badge-pending';
+  const label = labels[key] || status;
   return `<span class="badge ${cls}">${label}</span>`;
 }
 
-function getTierBadge(tierId) {
-  const tier = getTierById(tierId);
+function getTierBadge(tierIdOrKey) {
+  const tier = getTierById(tierIdOrKey);
+  const key = tierKey(tier);
   const colors = { member: '', silver: 'badge-silver', gold: 'badge-gold', platinum: 'badge-platinum' };
-  return `<span class="badge badge-tier ${colors[tierId] || ''}">${tier.name}</span>`;
+  return `<span class="badge badge-tier ${colors[key] || ''}">${tier.tierName}</span>`;
 }
 
 function normalizeTierKey(tier) {
-  const value = String(tier || '').toLowerCase();
-  if (value.includes('bronze') || value === 'member') return 'member';
-  if (value.includes('silver')) return 'silver';
-  if (value.includes('gold')) return 'gold';
-  if (value.includes('diamond') || value.includes('platinum')) return 'platinum';
-  return value || 'member';
+  return tierKey(tier);
 }
 
 function getTierBadgeFromLoyaltyTier(loyaltyTier) {
@@ -179,24 +278,36 @@ function getTierBadgeFromLoyaltyTier(loyaltyTier) {
 }
 
 function normalizeCustomer(customer) {
+  const tierId = customer.tierId ?? customer.tier_id ?? tierKeyToId(customer.loyaltyTier || customer.currentTier || customer.tier);
+  const tier = getTierById(tierId);
   return {
+    customerId: customer.customerId ?? numId(customer.id),
     fullName: customer.fullName || customer.name || '',
     phoneNumber: customer.phoneNumber || customer.phone || '',
     email: customer.email || '',
-    loyaltyTier: customer.loyaltyTier || customer.currentTier || customer.tier || 'member',
+    tierId: tier.tierId,
+    loyaltyTier: tier.tierName,
     currentPoints: Number(customer.currentPoints ?? customer.pointsBalance ?? customer.points ?? 0),
     totalVisits: Number(customer.totalVisits ?? 0),
     totalSpend: Number(customer.totalSpend ?? customer.totalSpending ?? 0)
   };
 }
 
+function tierKeyToId(tier) {
+  return getTierById(tier).tierId;
+}
+
 async function fetchAdminCustomers() {
   if (!window.AutoWashAPI) {
-    throw new Error('API chưa sẵn sàng.');
+    return MOCK_DATA.customers.map(normalizeCustomer);
   }
 
-  const list = await window.AutoWashAPI.customers.getAll();
-  return (Array.isArray(list) ? list : []).map(normalizeCustomer);
+  try {
+    const list = await window.AutoWashAPI.customers.getAll();
+    return (Array.isArray(list) ? list : []).map(normalizeCustomer);
+  } catch (e) {
+    return MOCK_DATA.customers.map(normalizeCustomer);
+  }
 }
 
 function saveToStorage(key, data) {
@@ -210,12 +321,27 @@ function loadFromStorage(key, fallback) {
 }
 
 function initStorage() {
+  const version = localStorage.getItem('autowash_schema_version');
+  if (version !== STORAGE_SCHEMA_VERSION) {
+    [
+      'vehicles', 'bookings', 'services', 'serviceCatalog', 'promotions', 'rewardCatalog',
+      'washHistory', 'loyaltyPoints', 'rewardRedemptions', 'customers', 'staffSchedule',
+      'timeSlots', 'loyaltyTransactions'
+    ].forEach(key => localStorage.removeItem('autowash_' + key));
+    localStorage.removeItem('autowash_initialized');
+    localStorage.setItem('autowash_schema_version', STORAGE_SCHEMA_VERSION);
+  }
+
   if (!localStorage.getItem('autowash_initialized')) {
     saveToStorage('vehicles', MOCK_DATA.vehicles);
     saveToStorage('bookings', MOCK_DATA.bookings);
-    saveToStorage('services', MOCK_DATA.services);
+    saveToStorage('serviceCatalog', MOCK_DATA.serviceCatalog);
     saveToStorage('promotions', MOCK_DATA.promotions);
     saveToStorage('rewardCatalog', MOCK_DATA.rewardCatalog);
+    saveToStorage('washHistory', MOCK_DATA.washHistory);
+    saveToStorage('loyaltyPoints', MOCK_DATA.loyaltyPoints);
+    saveToStorage('rewardRedemptions', MOCK_DATA.rewardRedemptions);
+    saveToStorage('customers', MOCK_DATA.customers);
     localStorage.setItem('autowash_initialized', 'true');
   }
 }
@@ -224,12 +350,20 @@ function getBookings() {
   return loadFromStorage('bookings', [...MOCK_DATA.bookings]);
 }
 
+function getWashHistory() {
+  return loadFromStorage('washHistory', [...MOCK_DATA.washHistory]);
+}
+
+function getLoyaltyPoints() {
+  return loadFromStorage('loyaltyPoints', [...MOCK_DATA.loyaltyPoints]);
+}
+
 function getVehicles() {
   return loadFromStorage('vehicles', [...MOCK_DATA.vehicles]);
 }
 
 function getActiveVehicles() {
-  return getVehicles().filter(v => v.isActive !== false);
+  return getVehicles();
 }
 
 function numId(value) {
@@ -255,15 +389,13 @@ function getLoggedInCustomerId() {
 function normalizeVehicle(vehicle) {
   const vehicleId = vehicle.vehicleId ?? numId(vehicle.id) ?? vehicle.id;
   return {
-    id: vehicleId,
     vehicleId,
+    id: vehicleId,
     customerId: vehicle.customerId,
     licensePlate: vehicle.licensePlate,
     vehicleType: vehicle.vehicleType,
     brand: vehicle.brand || '',
-    color: vehicle.color || '',
-    notes: vehicle.notes || '',
-    isActive: vehicle.isActive !== false
+    color: vehicle.color || ''
   };
 }
 
@@ -282,57 +414,138 @@ function usesRealApi() {
 }
 
 async function fetchCustomerVehicles(customerId) {
-  if (!window.AutoWashAPI) {
-    throw new Error('API chưa sẵn sàng.');
-  }
-
   const id = customerId ?? getLoggedInCustomerId();
   if (!id) {
     throw new Error('Chưa xác định được customer đang đăng nhập.');
   }
 
-  const list = await window.AutoWashAPI.vehicles.byCustomer(id);
-  return (Array.isArray(list) ? list : [])
-    .filter(v => v.isActive !== false)
-    .map(normalizeVehicle);
+  if (window.AutoWashAPI && usesRealApi()) {
+    const list = await window.AutoWashAPI.vehicles.byCustomer(id);
+    return (Array.isArray(list) ? list : []).map(normalizeVehicle);
+  }
+
+  if (window.AutoWashAPI) {
+    try {
+      const list = await window.AutoWashAPI.vehicles.byCustomer(id);
+      return (Array.isArray(list) ? list : []).map(normalizeVehicle);
+    } catch (e) { /* fallback local */ }
+  }
+
+  return getVehicles().filter(v => Number(v.customerId) === Number(id)).map(normalizeVehicle);
 }
 
 function normalizeReward(reward) {
   return {
     rewardId: reward.rewardId ?? numId(reward.id),
     rewardName: reward.rewardName || reward.name || '',
-    description: reward.description || '',
     pointsRequired: Number(reward.pointsRequired ?? reward.pointsCost ?? 0),
     discountAmount: Number(reward.discountAmount ?? 0),
-    stockQuantity: Number(reward.stockQuantity ?? 0),
-    isActive: reward.isActive !== false
+    freeWash: Boolean(reward.freeWash ?? reward.free_wash),
+    isActive: reward.isActive !== false,
+    createdByAdminId: reward.createdByAdminId ?? null
   };
 }
 
 function buildRewardRequest(fields) {
   return {
     rewardName: fields.rewardName,
-    description: fields.description || '',
     pointsRequired: Number(fields.pointsRequired),
-    discountAmount: Number(fields.discountAmount),
-    stockQuantity: Number(fields.stockQuantity),
+    discountAmount: Number(fields.discountAmount || 0),
+    freeWash: fields.freeWash === true || fields.freeWash === 'true',
     isActive: fields.isActive === true || fields.isActive === 'true'
   };
 }
 
 async function fetchAdminRewards() {
   if (!window.AutoWashAPI) {
-    throw new Error('API chưa sẵn sàng.');
+    return getRewardCatalog().map(normalizeReward);
   }
 
-  const list = await window.AutoWashAPI.rewards.getAll();
-  return (Array.isArray(list) ? list : []).map(normalizeReward);
+  try {
+    const list = await window.AutoWashAPI.rewards.getAll();
+    return (Array.isArray(list) ? list : []).map(normalizeReward);
+  } catch (e) {
+    return getRewardCatalog().map(normalizeReward);
+  }
 }
 
+function getServiceCatalog() {
+  return loadFromStorage('serviceCatalog', [...MOCK_DATA.serviceCatalog]);
+}
+
+/** @deprecated use getServiceCatalog — kept for older call sites */
 function getServices() {
-  return loadFromStorage('services', [...MOCK_DATA.services]);
+  return getServiceCatalog().map((s, i) => ({
+    id: `svc-${i + 1}`,
+    name: s.serviceType,
+    serviceType: s.serviceType,
+    price: s.basePrice,
+    active: true
+  }));
 }
 
 function getPromotions() {
   return loadFromStorage('promotions', [...MOCK_DATA.promotions]);
+}
+
+function getRewardCatalog() {
+  return loadFromStorage('rewardCatalog', [...MOCK_DATA.rewardCatalog]);
+}
+
+function getVehicleById(vehicleId) {
+  return getVehicles().find(v => Number(v.vehicleId) === Number(vehicleId));
+}
+
+function getCustomerNameByVehicle(vehicleId) {
+  const vehicle = getVehicleById(vehicleId);
+  if (!vehicle) return '-';
+  const customer = getCustomerById(vehicle.customerId);
+  return customer ? customer.fullName : '-';
+}
+
+function getWashForBooking(bookingId) {
+  return getWashHistory().find(w => Number(w.bookingId) === Number(bookingId));
+}
+
+function enrichBooking(booking) {
+  const vehicle = getVehicleById(booking.vehicleId);
+  const wash = getWashForBooking(booking.bookingId);
+  const customer = vehicle ? getCustomerById(vehicle.customerId) : null;
+  return {
+    ...booking,
+    customerId: customer?.customerId ?? vehicle?.customerId,
+    customerName: customer?.fullName || '-',
+    vehiclePlate: vehicle?.licensePlate || '-',
+    vehicleBrand: vehicle?.brand || '-',
+    amountPaid: wash?.amountPaid ?? null,
+    pointsEarned: wash?.pointsEarned ?? null,
+    perkApplied: wash?.perkApplied || null
+  };
+}
+
+function getEnrichedBookings() {
+  return getBookings().map(enrichBooking);
+}
+
+function getServiceBasePrice(serviceType) {
+  const item = getServiceCatalog().find(s => s.serviceType === serviceType);
+  return item ? Number(item.basePrice) : 0;
+}
+
+function buildStaffScheduleFromBookings() {
+  const today = new Date().toISOString().slice(0, 10);
+  return getEnrichedBookings()
+    .filter(b => b.bookingDate === today || ['Pending', 'Confirmed', 'In_Progress', 'InProgress'].includes(b.status))
+    .sort((a, b) => String(a.bookingTime).localeCompare(String(b.bookingTime)))
+    .map(b => ({
+      id: `ss-${b.bookingId}`,
+      bookingId: b.bookingId,
+      time: b.bookingTime,
+      customerId: b.customerId,
+      customerName: b.customerName,
+      vehicle: b.vehicleBrand,
+      licensePlate: b.vehiclePlate,
+      service: b.serviceType,
+      status: b.status
+    }));
 }

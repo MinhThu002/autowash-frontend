@@ -134,13 +134,8 @@ async function handleLogin(e) {
       return;
     }
   } else {
-    const role = detectLoginRole(loginKey);
-    user = persistAuthSession({
-      id: role === 'customer' ? 1 : role === 'staff' ? 2 : 1,
-      loginKey,
-      fullName: role === 'admin' ? 'Admin' : role === 'staff' ? 'Nhân viên' : 'Khách hàng',
-      roleName: role === 'admin' ? 'ROLE_MANAGER' : role === 'staff' ? 'ROLE_STAFF' : 'ROLE_CUSTOMER'
-    }, remember);
+    const session = resolveLocalAuth(loginKey);
+    user = persistAuthSession(session, remember);
   }
 
   window.location.href = getAuthRedirect(user.role);
@@ -151,6 +146,43 @@ function detectLoginRole(email) {
   if (lower.includes('admin') || lower === 'admin') return 'admin';
   if (lower.includes('staff') || lower.startsWith('staff')) return 'staff';
   return 'customer';
+}
+
+/** Local auth mapped to AdminAccount / Customer in WashPRo.sql sample data */
+function resolveLocalAuth(loginKey) {
+  const key = String(loginKey || '').trim().toLowerCase();
+  const admin = (MOCK_DATA.adminAccounts || []).find(a =>
+    String(a.username).toLowerCase() === key || String(a.username).toLowerCase() === key.replace(/@.*/, '')
+  );
+  if (admin) {
+    const role = String(admin.role || '').toLowerCase() === 'staff' ? 'staff' : 'admin';
+    return {
+      id: admin.adminId,
+      loginKey: admin.username,
+      fullName: admin.fullName,
+      roleName: role === 'staff' ? 'ROLE_STAFF' : 'ROLE_MANAGER'
+    };
+  }
+
+  const customer = (MOCK_DATA.customers || []).find(c =>
+    String(c.email || '').toLowerCase() === key || String(c.phoneNumber || '') === key
+  );
+  if (customer) {
+    return {
+      id: customer.customerId,
+      loginKey: customer.email || customer.phoneNumber,
+      fullName: customer.fullName,
+      roleName: 'ROLE_CUSTOMER'
+    };
+  }
+
+  const role = detectLoginRole(loginKey);
+  return {
+    id: role === 'customer' ? 1 : role === 'staff' ? 2 : 1,
+    loginKey,
+    fullName: role === 'admin' ? 'Admin' : role === 'staff' ? 'Nhân viên' : 'Khách hàng',
+    roleName: role === 'admin' ? 'ROLE_MANAGER' : role === 'staff' ? 'ROLE_STAFF' : 'ROLE_CUSTOMER'
+  };
 }
 
 async function handleRegister(e) {
@@ -344,4 +376,4 @@ function setupTableFilters(config) {
     if (el) el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', apply);
   });
 }
-
+

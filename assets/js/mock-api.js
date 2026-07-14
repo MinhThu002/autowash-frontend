@@ -767,20 +767,37 @@
       update: (id, payload) => request(`/api/promotions/${id}`, { method: 'PUT', body: payload }),
       remove: (id) => request(`/api/promotions/${id}`, { method: 'DELETE' })
     },
+    bookings: {
+      list: () => request('/api/v1/bookings'),
+      byCustomer: (customerId) => request(`/api/v1/bookings/customer/${customerId}`),
+      create: (payload) => request('/api/v1/bookings', { method: 'POST', body: payload }),
+      availableSlots: (date, washServiceId) =>
+        request(`/api/v1/bookings/available-slots?date=${encodeURIComponent(date)}&washServiceId=${washServiceId}`),
+      confirmArrival: (id) => request(`/api/v1/bookings/${id}/confirm-arrival`, { method: 'PUT' }),
+      complete: (id) => request(`/api/v1/bookings/${id}/complete`, { method: 'PUT' }),
+      cancel: (id) => request(`/api/v1/bookings/${id}/cancel`, { method: 'PUT' })
+    },
+    washServicesActive: {
+      list: () => request('/api/admin/wash-services/active')
+    },
     rewards: {
       getAll: () => request('/api/rewards/admin/all'),
+      catalog: () => request('/api/rewards/customer/catalog'),
       create: (payload) => request('/api/rewards/admin/create', { method: 'POST', body: payload }),
       update: (id, payload) => request(`/api/rewards/admin/update/${id}`, { method: 'PUT', body: payload }),
-      delete: (id) => request(`/api/rewards/admin/delete/${id}`, { method: 'DELETE' })
-    },
-    bookings: {
-      list: () => request('/api/bookings'),
-      create: (payload) => request('/api/bookings', { method: 'POST', body: payload }),
-      updateStatus: (id, status) => request(`/api/bookings/${id}/status`, { method: 'PATCH', body: { status } })
+      delete: (id) => request(`/api/rewards/admin/delete/${id}`, { method: 'DELETE' }),
+      redeem: (payload) => request('/api/rewards/customer/redeem', { method: 'POST', body: payload })
     },
     staff: {
-      schedule: () => request('/api/staff/schedule'),
-      updateStatus: (id, status) => request(`/api/staff/schedule/${id}/status`, { method: 'PATCH', body: { status } })
+      list: () => request('/api/staff'),
+      schedule: () => request('/api/v1/bookings'),
+      updateStatus: (id, status) => {
+        const key = String(status || '').toLowerCase();
+        if (key.includes('confirm')) return request(`/api/v1/bookings/${id}/confirm-arrival`, { method: 'PUT' });
+        if (key.includes('complete')) return request(`/api/v1/bookings/${id}/complete`, { method: 'PUT' });
+        if (key.includes('cancel')) return request(`/api/v1/bookings/${id}/cancel`, { method: 'PUT' });
+        return Promise.reject(new Error('Trạng thái không hỗ trợ'));
+      }
     }
   };
 

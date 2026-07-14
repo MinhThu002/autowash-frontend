@@ -207,16 +207,51 @@ function getCustomerById(id) {
   return customers.find(c => Number(c.customerId) === n || c.customerId === id);
 }
 
-function getCurrentCustomer() {
+function getAuthUser() {
   const stored = localStorage.getItem('autowash_user');
-  if (stored) {
-    try {
-      const user = JSON.parse(stored);
-      const raw = user.customerId ?? user.id;
-      return getCustomerById(raw) || getCustomerById(MOCK_DATA.currentCustomerId);
-    } catch (e) { /* ignore */ }
+  if (!stored) return null;
+  try { return JSON.parse(stored); } catch (e) { return null; }
+}
+
+function getCurrentCustomer() {
+  const user = getAuthUser();
+  if (user && usesRealApi()) {
+    const cached = loadFromStorage('currentCustomerProfile', null);
+    if (cached && Number(cached.customerId) === Number(user.customerId || user.id)) {
+      return normalizeCustomer(cached);
+    }
+    return normalizeCustomer({
+      customerId: user.customerId || user.id,
+      fullName: user.name || user.fullName || 'Khách hàng',
+      email: user.email || user.loginKey || '',
+      phoneNumber: user.phoneNumber || '',
+      tierId: user.tierId || 1,
+      currentPoints: user.currentPoints || 0,
+      totalVisits: user.totalVisits || 0,
+      totalSpend: user.totalSpend || 0,
+      loyaltyTier: user.loyaltyTier || 'Member'
+    });
+  }
+
+  if (user) {
+    const raw = user.customerId ?? user.id;
+    return getCustomerById(raw) || getCustomerById(MOCK_DATA.currentCustomerId);
   }
   return getCustomerById(MOCK_DATA.currentCustomerId);
+}
+
+async function refreshCurrentCustomerProfile() {
+  if (!usesRealApi() || !window.AutoWashAPI) return getCurrentCustomer();
+  const id = getLoggedInCustomerId();
+  if (!id) return getCurrentCustomer();
+  try {
+    const profile = await window.AutoWashAPI.customers.profile(id);
+    const normalized = normalizeCustomer({ ...profile, customerId: id });
+    saveToStorage('currentCustomerProfile', normalized);
+    return normalized;
+  } catch (e) {
+    return getCurrentCustomer();
+  }
 }
 
 function formatCurrency(amount) {
@@ -449,9 +484,10 @@ function normalizeReward(reward) {
 function buildRewardRequest(fields) {
   return {
     rewardName: fields.rewardName,
+    description: fields.description || '',
     pointsRequired: Number(fields.pointsRequired),
     discountAmount: Number(fields.discountAmount || 0),
-    freeWash: fields.freeWash === true || fields.freeWash === 'true',
+    stockQuantity: Number(fields.stockQuantity ?? 100),
     isActive: fields.isActive === true || fields.isActive === 'true'
   };
 }

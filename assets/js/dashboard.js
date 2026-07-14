@@ -140,25 +140,22 @@ async function saveVehicle(e) {
     return;
   }
 
+  if (!window.AutoWashAPI) {
+    showToast('API chưa sẵn sàng.');
+    return;
+  }
+
   try {
-    if (window.AutoWashAPI && usesRealApi()) {
-      if (vehicleId) await window.AutoWashAPI.vehicles.update(Number(vehicleId), payload);
-      else await window.AutoWashAPI.vehicles.create(payload);
+    if (vehicleId) {
+      await window.AutoWashAPI.vehicles.update(Number(vehicleId), payload);
     } else {
-      let vehicles = getVehicles();
-      if (vehicleId) {
-        vehicles = vehicles.map(v => Number(v.vehicleId) === Number(vehicleId) ? { ...v, ...payload, vehicleId: Number(vehicleId) } : v);
-      } else {
-        const nextId = vehicles.reduce((m, v) => Math.max(m, Number(v.vehicleId) || 0), 0) + 1;
-        vehicles.push({ vehicleId: nextId, ...payload });
-      }
-      saveToStorage('vehicles', vehicles);
+      await window.AutoWashAPI.vehicles.create(payload);
     }
     closeModal('vehicleModal');
     showToast(vehicleId ? 'Cập nhật xe thành công!' : 'Thêm xe thành công!');
     await renderVehiclesPage();
   } catch (error) {
-    showToast(error.message || 'Lưu xe thất bại.');
+    showToast(error.message || 'Lưu xe thất bại. Kiểm tra backend đang chạy.');
   }
 }
 
@@ -188,12 +185,13 @@ async function editVehicle(id) {
 async function deleteVehicle(id) {
   if (!confirm('Bạn có chắc muốn xóa xe này?')) return;
 
+  if (!window.AutoWashAPI) {
+    showToast('API chưa sẵn sàng.');
+    return;
+  }
+
   try {
-    if (window.AutoWashAPI && usesRealApi()) {
-      await window.AutoWashAPI.vehicles.remove(Number(id));
-    } else {
-      saveToStorage('vehicles', getVehicles().filter(v => Number(v.vehicleId) !== Number(id)));
-    }
+    await window.AutoWashAPI.vehicles.remove(Number(id));
     showToast('Đã xóa xe.');
     await renderVehiclesPage();
   } catch (error) {
@@ -212,19 +210,37 @@ function renderBookingHistory() {
   const customer = getCurrentCustomer();
   setUserNav(customer);
   const tbody = document.querySelector('#bookingsTable tbody');
-  tbody.innerHTML = '';
-  getEnrichedBookings().filter(b => Number(b.customerId) === Number(customer.customerId)).forEach(b => {
-    tbody.innerHTML += `<tr data-status="${normalizeStatus(b.status)}" data-date="${b.bookingDate}">
-      <td><strong>#${b.bookingId}</strong></td>
-      <td>${formatDate(b.bookingDate)}</td>
-      <td>${b.bookingTime}</td>
-      <td>${b.vehiclePlate}</td>
-      <td>${b.serviceType}</td>
-      <td>${getStatusBadge(b.status)}</td>
-      <td>${b.amountPaid != null ? formatCurrency(b.amountPaid) : '-'}</td>
-      <td>${b.pointsEarned != null ? b.pointsEarned : '-'}</td>
-    </tr>`;
-  });
+  tbody.innerHTML = '<tr><td colspan="8">Đang tải...</td></tr>';
+
+  const renderRows = (rows) => {
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8">Chưa có lịch sử đặt lịch.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(b => `
+      <tr data-status="${normalizeStatus(b.status)}" data-date="${b.bookingDate || ''}">
+        <td><strong>#${b.bookingId ?? b.id}</strong></td>
+        <td>${formatDate(b.bookingDate)}</td>
+        <td>${b.bookingTime || b.createdAt || '-'}</td>
+        <td>${b.vehiclePlate || b.licensePlate || '-'}</td>
+        <td>${b.serviceType || b.serviceName || '-'}</td>
+        <td>${getStatusBadge(b.status)}</td>
+        <td>${b.amountPaid != null || b.totalPrice != null ? formatCurrency(b.amountPaid ?? b.totalPrice) : '-'}</td>
+        <td>${b.pointsEarned != null ? b.pointsEarned : '-'}</td>
+      </tr>`).join('');
+  };
+
+  if (usesRealApi() && window.AutoWashAPI) {
+    window.AutoWashAPI.bookings.byCustomer(getLoggedInCustomerId())
+      .then(list => renderRows(Array.isArray(list) ? list : []))
+      .catch(err => {
+        tbody.innerHTML = '<tr><td colspan="8">Không tải được lịch sử từ server.</td></tr>';
+        showToast(err.message || 'Không tải được lịch sử.');
+      });
+    return;
+  }
+
+  renderRows(getEnrichedBookings().filter(b => Number(b.customerId) === Number(customer.customerId)));
 }
 
 function renderLoyaltyPage() {
@@ -268,6 +284,19 @@ function redeemReward(id, cost) {
   const customer = getCurrentCustomer();
   if (customer.currentPoints < cost) {
     showToast('Không đủ điểm để đổi thưởng.');
+    return;
+  }
+
+  if (usesRealApi() && window.AutoWashAPI) {
+    window.AutoWashAPI.rewards.redeem({
+      customerId: Number(getLoggedInCustomerId()),
+      rewardId: Number(id),
+      quantity: 1
+    }).then(async () => {
+      showToast('Đổi thưởng thành công!');
+      await refreshCurrentCustomerProfile();
+      renderLoyaltyPage();
+    }).catch(err => showToast(err.message || 'Đổi thưởng thất bại.'));
     return;
   }
 
@@ -399,53 +428,92 @@ function renderAdminCustomers() {
 
 function renderAdminBookings() {
   const tbody = document.querySelector('#adminBookingsTable tbody');
-  tbody.innerHTML = '';
-  getEnrichedBookings().forEach(b => {
-    tbody.innerHTML += `<tr data-status="${normalizeStatus(b.status)}" data-id="${b.bookingId}">
-      <td>${b.customerName}</td><td>${b.vehiclePlate}</td><td>${b.serviceType}</td>
-      <td>${formatDate(b.bookingDate)}</td><td>${b.bookingTime}</td><td>${getStatusBadge(b.status)}</td>
-      <td>${b.amountPaid != null ? formatCurrency(b.amountPaid) : '-'}</td>
-      <td class="actions">
-        <button class="btn btn-sm btn-secondary" onclick="updateBookingStatus(${b.bookingId},'Confirmed')">Xác nhận</button>
-        <button class="btn btn-sm btn-primary" onclick="updateBookingStatus(${b.bookingId},'In_Progress')">Đang rửa</button>
-        <button class="btn btn-sm btn-primary" onclick="updateBookingStatus(${b.bookingId},'Completed')">Hoàn thành</button>
-        <button class="btn btn-sm btn-danger" onclick="updateBookingStatus(${b.bookingId},'Cancelled')">Hủy</button>
-      </td></tr>`;
-  });
+  tbody.innerHTML = '<tr><td colspan="8">Đang tải...</td></tr>';
+
+  const renderRows = (rows) => {
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8">Chưa có booking.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(b => {
+      const id = b.bookingId ?? b.id;
+      return `<tr data-status="${normalizeStatus(b.status)}" data-id="${id}">
+        <td>${b.customerName || b.fullName || '-'}</td>
+        <td>${b.vehiclePlate || b.licensePlate || '-'}</td>
+        <td>${b.serviceType || b.serviceName || '-'}</td>
+        <td>${formatDate(b.bookingDate)}</td>
+        <td>${b.bookingTime || b.createdAt || '-'}</td>
+        <td>${getStatusBadge(b.status)}</td>
+        <td>${b.amountPaid != null || b.totalPrice != null ? formatCurrency(b.amountPaid ?? b.totalPrice) : '-'}</td>
+        <td class="actions">
+          <button class="btn btn-sm btn-secondary" onclick="updateBookingStatus(${id},'Confirmed')">Xác nhận</button>
+          <button class="btn btn-sm btn-primary" onclick="updateBookingStatus(${id},'Completed')">Hoàn thành</button>
+          <button class="btn btn-sm btn-danger" onclick="updateBookingStatus(${id},'Cancelled')">Hủy</button>
+        </td></tr>`;
+    }).join('');
+  };
+
+  if (usesRealApi() && window.AutoWashAPI) {
+    window.AutoWashAPI.bookings.list()
+      .then(list => renderRows(Array.isArray(list) ? list : []))
+      .catch(err => {
+        tbody.innerHTML = '<tr><td colspan="8">Không tải được booking từ server.</td></tr>';
+        showToast(err.message || 'Không tải được booking.');
+      });
+    return;
+  }
+
+  renderRows(getEnrichedBookings());
 }
 
-function updateBookingStatus(id, status) {
-  const bookings = getBookings().map(b => Number(b.bookingId) === Number(id) ? { ...b, status } : b);
-  saveToStorage('bookings', bookings);
+async function updateBookingStatus(id, status) {
+  const key = normalizeStatus(status);
 
-  if (status === 'Cancelled') {
-    const updated = getBookings().map(b => Number(b.bookingId) === Number(id) ? { ...b, cancelledByAdminId: 1 } : b);
-    saveToStorage('bookings', updated);
-  }
-
-  if (status === 'Completed') {
-    const booking = getBookings().find(b => Number(b.bookingId) === Number(id));
-    if (booking && !getWashForBooking(id)) {
-      const history = getWashHistory();
-      const washId = history.reduce((m, w) => Math.max(m, Number(w.washId) || 0), 0) + 1;
-      const amountPaid = getServiceBasePrice(booking.serviceType);
-      const tier = getTierById(booking.tierIdAtBooking);
-      const pointsEarned = Math.round(amountPaid / 1000 * tier.pointMultiplier);
-      history.push({
-        washId,
-        bookingId: Number(id),
-        washDate: new Date().toISOString(),
-        amountPaid,
-        pointsEarned,
-        pointsUsed: 0,
-        perkApplied: getTierDiscountPercent(tier.tierId) ? `Giảm ${getTierDiscountPercent(tier.tierId)}%` : 'Không'
-      });
-      saveToStorage('washHistory', history);
+  try {
+    if (usesRealApi() && window.AutoWashAPI) {
+      if (key === 'confirmed') await window.AutoWashAPI.bookings.confirmArrival(id);
+      else if (key === 'completed') await window.AutoWashAPI.bookings.complete(id);
+      else if (key === 'cancelled') await window.AutoWashAPI.bookings.cancel(id);
+      else throw new Error('Trạng thái không hỗ trợ trên API');
+      showToast('Cập nhật trạng thái thành công!');
+      location.reload();
+      return;
     }
-  }
 
-  showToast('Cập nhật trạng thái thành công!');
-  location.reload();
+    const bookings = getBookings().map(b => Number(b.bookingId) === Number(id) ? { ...b, status } : b);
+    saveToStorage('bookings', bookings);
+
+    if (status === 'Cancelled') {
+      const updated = getBookings().map(b => Number(b.bookingId) === Number(id) ? { ...b, cancelledByAdminId: 1 } : b);
+      saveToStorage('bookings', updated);
+    }
+
+    if (status === 'Completed') {
+      const booking = getBookings().find(b => Number(b.bookingId) === Number(id));
+      if (booking && !getWashForBooking(id)) {
+        const history = getWashHistory();
+        const washId = history.reduce((m, w) => Math.max(m, Number(w.washId) || 0), 0) + 1;
+        const amountPaid = getServiceBasePrice(booking.serviceType);
+        const tier = getTierById(booking.tierIdAtBooking);
+        const pointsEarned = Math.round(amountPaid / 1000 * tier.pointMultiplier);
+        history.push({
+          washId,
+          bookingId: Number(id),
+          washDate: new Date().toISOString(),
+          amountPaid,
+          pointsEarned,
+          pointsUsed: 0,
+          perkApplied: getTierDiscountPercent(tier.tierId) ? `Giảm ${getTierDiscountPercent(tier.tierId)}%` : 'Không'
+        });
+        saveToStorage('washHistory', history);
+      }
+    }
+
+    showToast('Cập nhật trạng thái thành công!');
+    location.reload();
+  } catch (error) {
+    showToast(error.message || 'Cập nhật thất bại.');
+  }
 }
 
 function renderAdminServices() {
@@ -666,32 +734,51 @@ function openAddService() {
   openModal('serviceModal');
 }
 
-function savePromotion(e) {
+async function savePromotion(e) {
   e.preventDefault();
   const id = document.getElementById('promoId').value;
   const minTierRaw = document.getElementById('promoTier').value;
-  const data = {
-    promotionId: id ? Number(id) : null,
-    title: document.getElementById('promoName').value.trim(),
-    description: document.getElementById('promoDescription').value.trim(),
-    discountPercent: parseFloat(document.getElementById('promoDiscountValue').value) || 0,
+  const payload = {
+    promoName: document.getElementById('promoName').value.trim(),
+    description: document.getElementById('promoDescription').value.trim() || 'N/A',
+    discountAmount: parseFloat(document.getElementById('promoDiscountValue').value) || 0,
     startDate: document.getElementById('promoStart').value,
     endDate: document.getElementById('promoEnd').value,
     minTierId: minTierRaw === 'all' ? null : Number(minTierRaw),
-    status: document.getElementById('promoStatus').value,
-    createdByAdminId: 1
+    isActive: document.getElementById('promoStatus').value === 'Active'
   };
-  let promos = getPromotions();
-  if (id) {
-    promos = promos.map(p => Number(p.promotionId) === Number(id) ? { ...p, ...data, promotionId: Number(id) } : p);
-  } else {
-    data.promotionId = promos.reduce((m, p) => Math.max(m, Number(p.promotionId) || 0), 0) + 1;
-    promos = [...promos, data];
+
+  try {
+    if (usesRealApi() && window.AutoWashAPI) {
+      if (id) await window.AutoWashAPI.promotions.update(Number(id), payload);
+      else await window.AutoWashAPI.promotions.create(payload);
+    } else {
+      let promos = getPromotions();
+      const data = {
+        promotionId: id ? Number(id) : null,
+        title: payload.promoName,
+        description: payload.description,
+        discountPercent: payload.discountAmount,
+        startDate: payload.startDate,
+        endDate: payload.endDate,
+        minTierId: payload.minTierId,
+        status: payload.isActive ? 'Active' : 'Inactive',
+        createdByAdminId: 1
+      };
+      if (id) {
+        promos = promos.map(p => Number(p.promotionId) === Number(id) ? { ...p, ...data, promotionId: Number(id) } : p);
+      } else {
+        data.promotionId = promos.reduce((m, p) => Math.max(m, Number(p.promotionId) || 0), 0) + 1;
+        promos = [...promos, data];
+      }
+      saveToStorage('promotions', promos);
+    }
+    closeModal('promotionModal');
+    showToast('Lưu khuyến mãi thành công!');
+    location.reload();
+  } catch (error) {
+    showToast(error.message || 'Lưu khuyến mãi thất bại.');
   }
-  saveToStorage('promotions', promos);
-  closeModal('promotionModal');
-  showToast('Lưu khuyến mãi thành công!');
-  location.reload();
 }
 
 function editPromotion(id) {
@@ -727,9 +814,10 @@ async function saveReward(e) {
   const rewardId = document.getElementById('rewardId').value;
   const payload = buildRewardRequest({
     rewardName: document.getElementById('rewardName').value.trim(),
+    description: '',
     pointsRequired: document.getElementById('rewardPoints').value,
     discountAmount: document.getElementById('rewardDiscount').value,
-    freeWash: document.getElementById('rewardFreeWash').value,
+    stockQuantity: document.getElementById('rewardStock')?.value || 100,
     isActive: document.getElementById('rewardActive').value
   });
 

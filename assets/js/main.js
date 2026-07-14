@@ -129,8 +129,11 @@ async function handleLogin(e) {
     try {
       const auth = await window.AutoWashAPI.auth.login(loginKey, password);
       user = persistAuthSession(auth, remember);
+      if (user.role === 'customer' && typeof refreshCurrentCustomerProfile === 'function') {
+        try { await refreshCurrentCustomerProfile(); } catch (e) { /* optional */ }
+      }
     } catch (error) {
-      showFormError(e.target, error.message || 'Đăng nhập thất bại.');
+      showFormError(e.target, error.message || 'Đăng nhập thất bại. Hãy kiểm tra backend (localhost:8080) đang chạy.');
       return;
     }
   } else {

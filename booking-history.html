@@ -1,45 +1,123 @@
-﻿<!DOCTYPE html>
+﻿<!doctype html>
 <html lang="vi">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lịch sử đặt lịch - AutoWash Pro</title>
-  <link rel="stylesheet" href="assets/css/style.css">
-  <link rel="stylesheet" href="assets/css/dashboard.css">
-  <link rel="stylesheet" href="assets/css/responsive.css">
-</head>
-<body data-page="booking-history">
-<div class="app-layout">
-  <div class="sidebar-overlay"></div>
-  <aside class="sidebar"><div class="sidebar-header"><a href="index.html" class="sidebar-logo">🚿 Auto<span>Wash</span> Pro</a><div class="sidebar-role">Khách hàng</div></div><nav class="sidebar-nav"><ul><li><a href="customer-dashboard.html" class=""><span class="nav-icon">📊</span>Dashboard</a></li><li><a href="customer-vehicles.html" class=""><span class="nav-icon">🚗</span>Xe của tôi</a></li><li><a href="booking.html" class=""><span class="nav-icon">📅</span>Đặt lịch</a></li><li><a href="booking-history.html" class="active"><span class="nav-icon">📋</span>Lịch sử</a></li><li><a href="loyalty.html" class=""><span class="nav-icon">⭐</span>Loyalty</a></li><li><a href="promotions.html" class=""><span class="nav-icon">🎁</span>Khuyến mãi</a></li></ul></nav><div class="sidebar-footer"><a href="#" onclick="logout();return false">🚪 Đăng xuất</a></div></aside>
-  <main class="main-content">
-    <header class="navbar">
-      <div class="navbar-left">
-        <button type="button" class="sidebar-toggle" aria-label="Menu">☰</button>
-        <div class="navbar-title"><h2>Lịch sử đặt lịch</h2></div>
-      </div>
-      <div class="navbar-right">
-        <div class="navbar-user">
-          <div class="user-avatar">NA</div>
-          <div class="user-info"><div class="user-name">User</div><div class="user-tier">Member</div></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lịch sử đặt lịch - AutoWash Pro</title>
+    <link rel="stylesheet" href="assets/css/style.css" />
+    <link rel="stylesheet" href="assets/css/dashboard.css" />
+    <link rel="stylesheet" href="assets/css/responsive.css" />
+  </head>
+  <body data-page="booking-history">
+    <div class="app-layout">
+      <div class="sidebar-overlay"></div>
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <a href="index.html" class="sidebar-logo"
+            >🚿 Auto<span>Wash</span> Pro</a
+          >
+          <div class="sidebar-role">Khách hàng</div>
         </div>
-      </div>
-    </header>
-    <div class="page-content">
-<div class="filter-bar">
-  <select id="filterStatus"><option value="all">Tất cả trạng thái</option><option value="pending">Chờ xác nhận</option><option value="confirmed">Đã xác nhận</option><option value="in_progress">Đang rửa</option><option value="completed">Hoàn thành</option><option value="cancelled">Đã hủy</option></select>
-  <input type="date" id="filterDateFrom" placeholder="Từ ngày">
-  <input type="date" id="filterDateTo" placeholder="Đến ngày">
-</div>
-<div class="card table-wrapper"><table class="table" id="bookingsTable"><thead><tr><th>Mã</th><th>Ngày</th><th>Giờ</th><th>Xe</th><th>Dịch vụ</th><th>Trạng thái</th><th>Tổng</th><th>Điểm</th></tr></thead><tbody></tbody></table></div>
-</div>
-  </main>
-</div>
-  <script src="assets/js/mock-data.js"></script>
-  <script src="assets/js/api-config.js"></script>
-  <script src="assets/js/mock-api.js"></script>
-  <script src="assets/js/main.js"></script>
-  <script src="assets/js/modal.js"></script>
-  <script src="assets/js/dashboard.js"></script>
-</body>
+        <nav class="sidebar-nav">
+          <ul>
+            <li>
+              <a href="customer-dashboard.html" class=""
+                ><span class="nav-icon">📊</span>Dashboard</a
+              >
+            </li>
+            <li>
+              <a href="customer-vehicles.html" class=""
+                ><span class="nav-icon">🚗</span>Xe của tôi</a
+              >
+            </li>
+            <li>
+              <a href="booking.html" class=""
+                ><span class="nav-icon">📅</span>Đặt lịch</a
+              >
+            </li>
+            <li>
+              <a href="booking-history.html" class="active"
+                ><span class="nav-icon">📋</span>Lịch sử</a
+              >
+            </li>
+            <li>
+              <a href="loyalty.html" class=""
+                ><span class="nav-icon">⭐</span>Loyalty</a
+              >
+            </li>
+            <li>
+              <a href="promotions.html" class=""
+                ><span class="nav-icon">🎁</span>Khuyến mãi</a
+              >
+            </li>
+          </ul>
+        </nav>
+        <div class="sidebar-footer">
+          <a
+            href="#"
+            onclick="
+              logout();
+              return false;
+            "
+            >🚪 Đăng xuất</a
+          >
+        </div>
+      </aside>
+      <main class="main-content">
+        <header class="navbar">
+          <div class="navbar-left">
+            <button type="button" class="sidebar-toggle" aria-label="Menu">
+              ☰
+            </button>
+            <!-- Lưu ý: Đổi thẻ <h2> theo đúng tên của từng trang (Dashboard, Xe của tôi, Loyalty, Khuyến mãi) -->
+            <div class="navbar-title"><h2>Booking History</h2></div>
+          </div>
+          <div class="navbar-right">
+            <div class="navbar-user">
+              <div class="user-avatar" id="navUserAvatar">...</div>
+              <div class="user-info">
+                <div class="user-name" id="navUserName">Đang tải...</div>
+                <div class="user-tier" id="navUserTier">...</div>
+              </div>
+            </div>
+          </div>
+        </header>
+        <div class="page-content">
+          <div class="filter-bar">
+            <select id="filterStatus">
+              <option value="all">Tất cả trạng thái</option>
+              <option value="pending">Chờ xác nhận</option>
+              <option value="confirmed">Đã xác nhận</option>
+              <option value="completed">Hoàn thành</option>
+              <option value="cancelled">Đã hủy</option>
+            </select>
+            <input type="date" id="filterDateFrom" placeholder="Từ ngày" />
+            <input type="date" id="filterDateTo" placeholder="Đến ngày" />
+          </div>
+          <div class="card table-wrapper">
+            <table class="table" id="bookingsTable">
+              <thead>
+                <tr>
+                  <th>Mã</th>
+                  <th>Ngày</th>
+                  <th>Giờ</th>
+                  <th>Xe</th>
+                  <th>Dịch vụ</th>
+                  <th>Trạng thái</th>
+                  <th>Tổng</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script src="assets/js/mock-data.js"></script>
+    <script src="assets/js/api-config.js"></script>
+    <script src="assets/js/mock-api.js"></script>
+    <script src="assets/js/main.js"></script>
+    <script src="assets/js/modal.js"></script>
+    <script src="assets/js/dashboard.js"></script>
+  </body>
 </html>

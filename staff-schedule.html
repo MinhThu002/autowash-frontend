@@ -1,41 +1,74 @@
-﻿<!DOCTYPE html>
+﻿<!doctype html>
 <html lang="vi">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lịch rửa xe hôm nay - AutoWash Pro</title>
-  <link rel="stylesheet" href="assets/css/style.css">
-  <link rel="stylesheet" href="assets/css/dashboard.css">
-  <link rel="stylesheet" href="assets/css/responsive.css">
-</head>
-<body data-page="staff-schedule">
-<div class="app-layout">
-  <div class="sidebar-overlay"></div>
-  <aside class="sidebar"><div class="sidebar-header"><a href="index.html" class="sidebar-logo">🚿 Auto<span>Wash</span> Pro</a><div class="sidebar-role">Nhân viên</div></div><nav class="sidebar-nav"><ul><li><a href="staff-schedule.html" class="active"><span class="nav-icon">📋</span>Lịch hôm nay</a></li></ul></nav><div class="sidebar-footer"><a href="#" onclick="logout();return false">🚪 Đăng xuất</a></div></aside>
-  <main class="main-content">
-    <header class="navbar">
-      <div class="navbar-left">
-        <button type="button" class="sidebar-toggle" aria-label="Menu">☰</button>
-        <div class="navbar-title"><h2>Lịch rửa xe hôm nay</h2></div>
-      </div>
-      <div class="navbar-right">
-        <div class="navbar-user">
-          <div class="user-avatar">NA</div>
-          <div class="user-info"><div class="user-name">User</div><div class="user-tier">Member</div></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lịch rửa xe hôm nay - AutoWash Pro</title>
+    <link rel="stylesheet" href="assets/css/style.css" />
+    <link rel="stylesheet" href="assets/css/dashboard.css" />
+    <link rel="stylesheet" href="assets/css/responsive.css" />
+  </head>
+  <body data-page="staff-schedule">
+    <div class="app-layout">
+      <div class="sidebar-overlay"></div>
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <a href="index.html" class="sidebar-logo"
+            >🚿 Auto<span>Wash</span> Pro</a
+          >
+          <div class="sidebar-role">Nhân viên</div>
         </div>
-      </div>
-    </header>
-    <div class="page-content">
-<p class="text-muted" style="margin-bottom:1rem">Lịch rửa xe ngày 19/5/2026</p>
-<div class="schedule-timeline" id="scheduleList"></div>
-</div>
-  </main>
-</div>
-  <script src="assets/js/mock-data.js"></script>
-  <script src="assets/js/api-config.js"></script>
-  <script src="assets/js/mock-api.js"></script>
-  <script src="assets/js/main.js"></script>
-  <script src="assets/js/modal.js"></script>
-  <script src="assets/js/dashboard.js"></script>
-</body>
+        <nav class="sidebar-nav">
+          <ul>
+            <li>
+              <a href="staff-schedule.html" class="active"
+                ><span class="nav-icon">📋</span>Lịch hôm nay</a
+              >
+            </li>
+          </ul>
+        </nav>
+        <div class="sidebar-footer">
+          <a
+            href="#"
+            onclick="
+              logout();
+              return false;
+            "
+            >🚪 Đăng xuất</a
+          >
+        </div>
+      </aside>
+      <main class="main-content">
+        <header class="navbar">
+          <div class="navbar-left">
+            <button type="button" class="sidebar-toggle" aria-label="Menu">
+              ☰
+            </button>
+            <div class="navbar-title"><h2>Lịch rửa xe hôm nay</h2></div>
+          </div>
+          <div class="navbar-right">
+            <div class="navbar-user">
+              <div class="user-avatar">NA</div>
+              <div class="user-info">
+                <div class="user-name">User</div>
+                <div class="user-tier">Member</div>
+              </div>
+            </div>
+          </div>
+        </header>
+        <div class="page-content">
+          <p class="text-muted" style="margin-bottom: 1rem">
+            Lịch rửa xe ngày 19/5/2026
+          </p>
+          <div class="schedule-timeline" id="scheduleList"></div>
+        </div>
+      </main>
+    </div>
+    <script src="assets/js/mock-data.js"></script>
+    <script src="assets/js/api-config.js"></script>
+    <script src="assets/js/mock-api.js"></script>
+    <script src="assets/js/main.js"></script>
+    <script src="assets/js/modal.js"></script>
+    <script src="assets/js/dashboard.js"></script>
+  </body>
 </html>

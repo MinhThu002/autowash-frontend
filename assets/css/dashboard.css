@@ -34,8 +34,12 @@
   text-decoration: none;
 }
 
-.sidebar-logo span { color: var(--cyan); }
-.sidebar-logo:hover { color: var(--white); }
+.sidebar-logo span {
+  color: var(--cyan);
+}
+.sidebar-logo:hover {
+  color: var(--white);
+}
 
 .sidebar-role {
   font-size: 0.6875rem;
@@ -52,7 +56,9 @@
   padding: 1rem 0;
 }
 
-.sidebar-nav ul { list-style: none; }
+.sidebar-nav ul {
+  list-style: none;
+}
 
 .sidebar-nav .nav-section {
   padding: 0.5rem 1.5rem;
@@ -87,7 +93,11 @@
   border-left-color: var(--cyan);
 }
 
-.sidebar-nav .nav-icon { font-size: 1.125rem; width: 24px; text-align: center; }
+.sidebar-nav .nav-icon {
+  font-size: 1.125rem;
+  width: 24px;
+  text-align: center;
+}
 
 .sidebar-footer {
   padding: 1rem 1.5rem;
@@ -103,7 +113,9 @@
   padding: 0.5rem 0;
 }
 
-.sidebar-footer a:hover { color: var(--danger); }
+.sidebar-footer a:hover {
+  color: var(--danger);
+}
 
 /* Main content */
 .main-content {
@@ -206,7 +218,10 @@
   gap: 1rem;
 }
 
-.page-header h2 { font-size: 1.5rem; margin: 0; }
+.page-header h2 {
+  font-size: 1.5rem;
+  margin: 0;
+}
 
 /* Dashboard grids */
 .stats-grid {
@@ -218,7 +233,7 @@
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1.25rem;
   margin-bottom: 1.25rem;
 }
@@ -250,7 +265,10 @@
   margin-bottom: 0.25rem;
 }
 
-.welcome-banner p { opacity: 0.85; font-size: 0.9375rem; }
+.welcome-banner p {
+  opacity: 0.85;
+  font-size: 0.9375rem;
+}
 
 .tier-highlight {
   background: rgb(255 255 255 / 0.15);
@@ -259,8 +277,14 @@
   text-align: center;
 }
 
-.tier-highlight .tier-label { font-size: 0.75rem; opacity: 0.8; }
-.tier-highlight .tier-value { font-size: 1.25rem; font-weight: 700; }
+.tier-highlight .tier-label {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+.tier-highlight .tier-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
 
 /* Tier progress */
 .tier-progress-card {
@@ -309,9 +333,14 @@
   font-size: 0.875rem;
 }
 
-.list-item:last-child { border-bottom: none; }
+.list-item:last-child {
+  border-bottom: none;
+}
 
-.list-item-meta { color: var(--gray-500); font-size: 0.8125rem; }
+.list-item-meta {
+  color: var(--gray-500);
+  font-size: 0.8125rem;
+}
 
 /* Analytics */
 .analytics-grid {
@@ -333,17 +362,38 @@
 
 .top-list {
   list-style: none;
+  padding: 0;
+  margin: 0;
+  flex: 1;
 }
 
 .top-list li {
   display: flex;
   justify-content: space-between;
-  padding: 0.625rem 0;
-  border-bottom: 1px solid var(--gray-100);
-  font-size: 0.875rem;
+  align-items: center;
+  padding: 1rem 0.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  font-size: 0.95rem;
 }
 
-.top-list li:last-child { border-bottom: none; }
+.top-list li:last-child {
+  border-bottom: none;
+}
+
+.top-list li span:first-child {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.top-list li span:last-child {
+  background: #e0f2fe;
+  color: #0284c7;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
 
 .top-list .rank {
   width: 24px;
@@ -379,8 +429,14 @@
   font-size: 1rem;
 }
 
-.schedule-details h4 { font-size: 0.9375rem; margin-bottom: 0.25rem; }
-.schedule-details p { font-size: 0.8125rem; color: var(--gray-500); }
+.schedule-details h4 {
+  font-size: 0.9375rem;
+  margin-bottom: 0.25rem;
+}
+.schedule-details p {
+  font-size: 0.8125rem;
+  color: var(--gray-500);
+}
 
 /* Loyalty page */
 .loyalty-hero {
@@ -390,17 +446,12 @@
   margin-bottom: 1.5rem;
 }
 
-.current-tier-card {
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
-  border: none;
-  text-align: center;
-  padding: 2rem;
+.badge[class*="tier-"] {
+  background-color: #c2daf1 !important;
+  color: #0a0a0a !important;
+  border: none !important;
+  background-image: none !important;
 }
-
-.current-tier-card.platinum { background: linear-gradient(135deg, #ede9fe, #c4b5fd); }
-.current-tier-card.gold { background: linear-gradient(135deg, #fef3c7, #fde68a); }
-.current-tier-card.silver { background: linear-gradient(135deg, #e2e8f0, #cbd5e1); }
-.current-tier-card.member { background: linear-gradient(135deg, #f1f5f9, #e2e8f0); }
 
 .points-display {
   font-size: 2.5rem;
@@ -462,7 +513,9 @@
   background: var(--white);
 }
 
-.time-slot:hover { border-color: var(--primary); }
+.time-slot:hover {
+  border-color: var(--primary);
+}
 .time-slot.selected {
   background: var(--primary);
   color: var(--white);
@@ -483,4 +536,273 @@
   z-index: 150;
 }
 
-.sidebar-overlay.active { display: block; }
+.sidebar-overlay.active {
+  display: block;
+}
+
+/* Style cho Badge hạng thành viên */
+.badge {
+  padding: 0.25rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: inline-block;
+  color: #fff;
+}
+
+/* Màu sắc cho từng hạng */
+.tier-bronze {
+  background-color: #cd7f32; /* Màu đồng */
+}
+
+.tier-silver {
+  background-color: #95a5a6; /* Màu bạc */
+  color: #fff;
+}
+
+.tier-gold {
+  background-color: #f1c40f; /* Màu vàng */
+  color: #000; /* Chữ đen để dễ nhìn trên nền vàng */
+}
+
+.tier-diamond {
+  background-color: #3498db; /* Màu xanh dương kim cương */
+  background-image: linear-gradient(
+    45deg,
+    #3498db,
+    #8e44ad
+  ); /* Hiệu ứng gradient bắt mắt */
+}
+
+/* Đảm bảo table nhìn thoáng hơn */
+.table td {
+  vertical-align: middle;
+}
+
+/* Style cho badge trạng thái */
+.badge {
+  padding: 0.25rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: inline-block;
+  color: #fff;
+}
+
+/* Màu trạng thái Active */
+.badge.status-active {
+  background-color: #27ae60; /* Xanh lá */
+}
+
+/* Màu trạng thái Inactive */
+.badge.status-inactive {
+  background-color: #7f8c8d; /* Xám */
+}
+
+/* =========================================
+   TRẠNG THÁI BOOKING (ĐÃ FIX LỖI MỜ CHỮ)
+   ========================================= */
+
+/* Chờ xác nhận (Nền vàng nhạt, chữ nâu vàng đậm) */
+.badge.pending,
+.badge.status-pending,
+.badge-pending {
+  background-color: #fff3cd !important;
+  color: #856404 !important;
+  border: 1px solid #ffeeba !important;
+}
+
+/* Đã xác nhận (Nền xanh dương nhạt, chữ xanh đậm) */
+.badge.confirmed,
+.badge.status-confirmed,
+.badge-confirmed {
+  background-color: #cce5ff !important;
+  color: #004085 !important;
+  border: 1px solid #b8daff !important;
+}
+
+/* Hoàn thành (Nền xanh lá nhạt, chữ xanh lá đậm) */
+.badge.completed,
+.badge.status-completed,
+.badge-completed {
+  background-color: #d4edda !important;
+  color: #155724 !important;
+  border: 1px solid #c3e6cb !important;
+}
+
+/* Đã hủy (Nền đỏ nhạt, chữ đỏ đậm) */
+.badge.cancelled,
+.badge.status-cancelled,
+.badge-cancelled {
+  background-color: #f8d7da !important;
+  color: #721c24 !important;
+  border: 1px solid #f5c6cb !important;
+}
+
+/* Custom thiết kế nhãn Trạng thái dạng viên thuốc (Pill Badge) */
+.badge,
+#servicesTable tbody td span {
+  display: inline-block;
+  padding: 0.35rem 1.1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase; /* Ép chữ viết hoa */
+  border-radius: 50px !important; /* Bo cong tròn tuyệt đối hình viên thuốc */
+  /* color: #ffffff !important;  */
+  letter-spacing: 0.5px;
+}
+
+/* Màu nền dành cho trạng thái Hoạt động (Active) */
+.status-active,
+.badge.active,
+.badge-active,
+#servicesTable tbody td .status-active {
+  background-color: #22c55e !important; /* Xanh lá chuẩn UI */
+}
+
+/* Màu nền dành cho trạng thái Vô hiệu hóa (Inactive) */
+.status-inactive,
+.badge.inactive,
+.badge-inactive,
+#servicesTable tbody td .status-inactive {
+  background-color: #78828a !important; /* Xám ghi chuẩn UI */
+}
+
+.modal-content {
+  background-color: #ffffff; /* Nền màu trắng */
+  padding: 24px; /* Khoảng cách từ viền vào chữ cho thoáng */
+  border-radius: 8px; /* Bo góc cho đẹp */
+  width: 80%; /* Độ rộng của bảng (tùy chỉnh theo ý bạn) */
+  max-width: 800px; /* Độ rộng tối đa */
+  margin: 50px auto; /* Căn giữa màn hình */
+
+  /* Thêm một chút bóng đổ (shadow) để bảng nổi bật lên */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Thẻ Card dùng chung */
+.card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.05),
+    0 2px 4px -2px rgb(0 0 0 / 0.05);
+  border: 1px solid #f1f5f9;
+}
+
+.card h3 {
+  font-size: 1.125rem;
+  color: #1e293b;
+  margin-bottom: 1.5rem;
+  font-weight: 700;
+}
+
+.dashboard-grid .card,
+.dashboard-grid-equal .card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Biểu đồ Doanh thu (Bar Chart) */
+.chart-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  height: 250px;
+  padding-top: 20px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.chart-bar {
+  flex: 1;
+  background: linear-gradient(180deg, #06b6d4 0%, #3b82f6 100%);
+  border-radius: 6px 6px 0 0;
+  position: relative;
+  transition: all 0.3s ease;
+  min-height: 4px;
+}
+
+.chart-bar:hover {
+  opacity: 0.85;
+  transform: translateY(-4px);
+}
+
+.chart-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.chart-labels span {
+  flex: 1;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+/* Biểu đồ Phân bổ Hạng (Donut Chart) */
+#tierChart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+.donut-chart {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  position: relative;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  margin: 10px auto;
+}
+
+.donut-chart::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 110px;
+  height: 110px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.donut-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 2rem !important;
+  width: 100%;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #475569;
+  font-weight: 600;
+  padding: 6px 12px;
+  background: #f8fafc;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}

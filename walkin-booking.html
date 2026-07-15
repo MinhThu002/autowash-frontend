@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tạo lịch trực tiếp (Walk-in) - AutoWash Pro</title>
+    <link rel="stylesheet" href="assets/css/style.css" />
+    <link rel="stylesheet" href="assets/css/dashboard.css" />
+    <link rel="stylesheet" href="assets/css/responsive.css" />
+    <style>
+      /* Style phụ cho phần chọn khung giờ và hóa đơn */
+      .time-slots-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .time-slot {
+        position: relative;
+      }
+      .time-slot input[type="radio"] {
+        display: none;
+      }
+      .time-slot label {
+        display: inline-block;
+        padding: 10px 15px;
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.3s;
+      }
+      .time-slot input[type="radio"]:checked + label {
+        background: #007bff;
+        color: white;
+        border-color: #007bff;
+      }
+      #receiptSummary {
+        display: none;
+        background: #e9ecef;
+        padding: 20px;
+        border-radius: 8px;
+        margin-top: 20px;
+      }
+      .receipt-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+    </style>
+  </head>
+  <body data-page="walkin-booking">
+    <div class="app-layout">
+      <div class="sidebar-overlay"></div>
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <a href="index.html" class="sidebar-logo"
+            >🚿 Auto<span>Wash</span> Pro</a
+          >
+          <div class="sidebar-role">Quản lý/Nhân viên</div>
+        </div>
+        <nav class="sidebar-nav">
+          <ul>
+            <li>
+              <a href="admin-dashboard.html"
+                ><span class="nav-icon">📊</span>Dashboard</a
+              >
+            </li>
+            <li>
+              <a href="admin-customers.html"
+                ><span class="nav-icon">👥</span>Khách hàng</a
+              >
+            </li>
+            <li>
+              <a href="admin-bookings.html"
+                ><span class="nav-icon">📅</span>Bookings</a
+              >
+            </li>
+            <li>
+              <a href="admin-services.html"
+                ><span class="nav-icon">🔧</span>Dịch vụ</a
+              >
+            </li>
+            <li>
+              <a href="admin-loyalty-tiers.html"
+                ><span class="nav-icon">🏆</span>Hạng TV</a
+              >
+            </li>
+            <li>
+              <a href="admin-promotions.html"
+                ><span class="nav-icon">🎁</span>Khuyến mãi</a
+              >
+            </li>
+            <li>
+              <a href="admin-rewards.html"
+                ><span class="nav-icon">🎖️</span>Quà tặng</a
+              >
+            </li>
+            <li>
+              <a href="walkin-booking.html" class="active"
+                ><span class="nav-icon">📝</span>WalkInBooking</a
+              >
+            </li>
+          </ul>
+        </nav>
+        <div class="sidebar-footer">
+          <a
+            href="#"
+            onclick="
+              logout();
+              return false;
+            "
+            >🚪 Đăng xuất</a
+          >
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="navbar">
+          <div class="navbar-left">
+            <button type="button" class="sidebar-toggle" aria-label="Menu">
+              ☰
+            </button>
+            <div class="navbar-title"><h2>Tạo lịch Walk-in</h2></div>
+          </div>
+          <div class="navbar-right">
+            <div class="navbar-user">
+              <div class="user-avatar" id="navUserAvatar">...</div>
+              <div class="user-info">
+                <div class="user-name" id="navUserName">Đang tải...</div>
+                <div class="user-tier" id="navUserTier">...</div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="page-content">
+          <div class="card">
+            <h3>Thông tin khách hàng vãng lai</h3>
+            <form id="walkinForm" class="mt-3">
+              <!-- 1. Thông tin khách hàng -->
+              <h4 class="mt-4 mb-2">1. Thông tin khách hàng</h4>
+              <div
+                class="form-row"
+                style="
+                  display: grid;
+                  grid-template-columns: 1fr 1fr 1fr;
+                  gap: 1rem;
+                "
+              >
+                <div class="form-group">
+                  <label for="email">Email</label>
+                  <input
+                    type="email"
+                    id="email"
+                    class="form-control"
+                    placeholder="VD: customer@gmail.com"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="fullName"
+                    >Họ và tên <span style="color: red">*</span></label
+                  >
+                  <input
+                    type="text"
+                    id="fullName"
+                    class="form-control"
+                    required
+                    placeholder="Nhập họ tên..."
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="phoneNumber"
+                    >Số điện thoại <span style="color: red">*</span></label
+                  >
+                  <input
+                    type="text"
+                    id="phoneNumber"
+                    class="form-control"
+                    required
+                    placeholder="Nhập số điện thoại..."
+                  />
+                </div>
+              </div>
+
+              <!-- 2. Thông tin xe -->
+              <h4 class="mt-4 mb-2">2. Thông tin xe</h4>
+              <div
+                class="form-row"
+                style="
+                  display: grid;
+                  grid-template-columns: 1fr 1fr 1fr 1fr;
+                  gap: 1rem;
+                "
+              >
+                <div class="form-group">
+                  <label for="licensePlate"
+                    >Biển số xe <span style="color: red">*</span></label
+                  >
+                  <input
+                    type="text"
+                    id="licensePlate"
+                    class="form-control"
+                    required
+                    placeholder="VD: 61A-22222"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="brand"
+                    >Hãng xe <span style="color: red">*</span></label
+                  >
+                  <input
+                    type="text"
+                    id="brand"
+                    class="form-control"
+                    required
+                    placeholder="VD: Honda, Toyota..."
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="color"
+                    >Màu sắc <span style="color: red">*</span></label
+                  >
+                  <input
+                    type="text"
+                    id="color"
+                    class="form-control"
+                    required
+                    placeholder="VD: Đỏ, Xanh..."
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="vehicleType"
+                    >Loại xe <span style="color: red">*</span></label
+                  >
+                  <select id="vehicleType" class="form-control" required>
+                    <option value="small">small</option>
+                    <option value="medium">medium</option>
+                    <option value="large">large</option>
+                    <option value="extra">extra</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- 3. Thông tin dịch vụ và thời gian -->
+              <h4 class="mt-4 mb-2">3. Dịch vụ & Thời gian</h4>
+              <div
+                class="form-row"
+                style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem"
+              >
+                <div class="form-group">
+                  <label for="washServiceId"
+                    >Dịch vụ sử dụng <span style="color: red">*</span></label
+                  >
+                  <select id="washServiceId" class="form-control" required>
+                    <option value="">-- Chọn dịch vụ --</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="date"
+                    >Ngày đặt lịch <span style="color: red">*</span></label
+                  >
+                  <input type="date" id="date" class="form-control" required />
+                </div>
+              </div>
+
+              <div class="form-group mt-3">
+                <label>Khung giờ trống <span style="color: red">*</span></label>
+                <div id="timeSlotsContainer" class="time-slots-container mt-1">
+                  <p class="text-muted">
+                    Vui lòng chọn dịch vụ và ngày để xem khung giờ.
+                  </p>
+                </div>
+              </div>
+
+              <!-- Nút submit -->
+              <div class="form-actions mt-4">
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                  id="btnSubmitWalkin"
+                >
+                  Tạo lịch Walk-in
+                </button>
+              </div>
+            </form>
+
+            <!-- Khối hiển thị biên lai sau khi tạo thành công -->
+            <div id="receiptSummary">
+              <h3 style="color: #28a745; text-align: center">
+                ✅ Đặt lịch thành công!
+              </h3>
+              <hr />
+              <div class="receipt-row">
+                <span>Phí cơ bản:</span> <strong id="resBasePrice">0 đ</strong>
+              </div>
+              <div class="receipt-row">
+                <span>Giảm Hạng:</span>
+                <strong id="resTierDiscount">0 đ</strong>
+              </div>
+              <hr />
+              <div
+                class="receipt-row"
+                style="font-size: 1.2rem; color: #d9534f"
+              >
+                <span>Tổng thanh toán:</span>
+                <strong id="resFinalPrice">0 đ</strong>
+              </div>
+              <div class="receipt-row mt-2 text-muted">
+                <span>Điểm tích lũy:</span>
+                <strong id="resTotalPoint">0 điểm</strong>
+              </div>
+              <div class="text-center mt-3">
+                <button class="btn btn-primary" onclick="location.reload()">
+                  Tạo lịch mới
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="assets/js/mock-data.js"></script>
+    <script src="assets/js/api-config.js"></script>
+    <script src="assets/js/main.js"></script>
+    <script src="assets/js/walkin-booking.js"></script>
+    <script src="assets/js/dashboard.js"></script>
+  </body>
+</html>

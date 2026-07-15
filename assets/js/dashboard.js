@@ -1,6 +1,7 @@
 /* AutoWash Pro - Dashboard & Page Renderers */
 document.addEventListener("DOMContentLoaded", () => {
   loadHeaderUserInfoFromAPI();
+  adjustSidebarForRole();
   const page = document.body.dataset.page;
   if (!page) return;
 
@@ -1062,34 +1063,161 @@ function renderAdminRewards() {
     });
 }
 
-function renderStaffSchedule() {
-  const container = document.getElementById("scheduleList");
-  const schedule = loadFromStorage("staffSchedule", MOCK_DATA.staffSchedule);
-  container.innerHTML = schedule
-    .map(
-      (s) => `
-    <div class="schedule-item">
-      <div class="schedule-time">${s.time}</div>
-      <div class="schedule-details">
-        <h4>${s.customerName}</h4>
-        <p>${s.vehicle} • ${s.licensePlate} • ${s.service}</p>
-      </div>
-      <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
-        ${getStatusBadge(s.status)}
-        ${s.status !== "in_progress" ? `<button class="btn btn-sm btn-primary" onclick="updateScheduleStatus('${s.id}','in_progress')">Bắt đầu</button>` : ""}
-        ${s.status !== "completed" ? `<button class="btn btn-sm btn-secondary" onclick="updateScheduleStatus('${s.id}','completed')">Hoàn thành</button>` : ""}
-      </div>
-    </div>`,
-    )
-    .join("");
+async function renderStaffSchedule() {
+  // Chỉ cho phép staff và admin truy cập trang này
+  if (!requireAuth(["staff", "admin"])) return;
+
+  const scheduleContainer = document.querySelector("#scheduleList");
+  if (!scheduleContainer) return;
+
+  // 1. Lấy ngày hôm nay định dạng YYYY-MM-DD và DD/MM/YYYY để hiển thị động
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+  const todayStr = `${yyyy}-${mm}-${dd}`; // Ví dụ: "2026-07-16"
+  const todayDisplay = `${dd}/${mm}/${yyyy}`;
+
+  // Cập nhật text hiển thị ngày động trên UI
+  const dateTextEl = document.querySelector(".page-content .text-muted");
+  if (dateTextEl) {
+    dateTextEl.textContent = `Lịch rửa xe ngày ${todayDisplay}`;
+  }
+
+  scheduleContainer.innerHTML =
+    '<div class="text-center">Đang tải lịch trình...</div>';
+
+  try {
+    const userStr = localStorage.getItem("autowash_user");
+    const token = userStr ? JSON.parse(userStr).token : "";
+
+    // 2. Gọi API chuẩn của hệ thống kèm Token bảo mật
+    const response = await fetch("http://localhost:8080/api/v1/bookings", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "*/*",
+      },
+    });
+    if (!response.ok) throw new Error("Không thể lấy dữ liệu lịch trình.");
+
+    const bookings = await response.json();
+
+    // 3. Lọc danh sách: Chỉ lấy booking hôm nay
+    const todayBookings = bookings.filter((booking) => {
+      if (!booking.bookingDate) return false;
+      const bookingDate = booking.bookingDate.split("T")[0];
+      return bookingDate === todayStr;
+    });
+
+    if (todayBookings.length === 0) {
+      scheduleContainer.innerHTML = `
+        <div class="empty-state" style="text-align: center; padding: 2rem;">
+          <p class="text-muted">Hôm nay (${todayDisplay}) không có lịch đặt xe nào.</p>
+        </div>`;
+      return;
+    }
+
+    // 4. Render danh sách dạng timeline card động thích hợp cấu trúc HTML gốc
+    scheduleContainer.innerHTML = todayBookings
+      .map((booking) => {
+        const bookingId = booking.bookingId || booking.id;
+        const statusLower = booking.status
+          ? booking.status.toLowerCase()
+          : "pending";
+        const timeStr = booking.startTime
+          ? booking.startTime.substring(0, 5)
+          : booking.startSlotName || "--:--";
+
+        return `
+          <div class="timeline-item" style="display: flex; gap: 1.5rem; margin-bottom: 1.5rem; border-left: 3px solid #007bff; padding-left: 1rem;">
+            <div class="timeline-time" style="min-width: 60px; font-weight: bold; color: #007bff; font-size: 1.1rem;">
+              ${timeStr}
+            </div>
+            <div class="timeline-content card" style="flex: 1; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">
+                  ${booking.customerName || booking.fullName || "Khách vãng lai"}
+                </h4>
+                ${getStatusBadge(statusLower)}
+              </div>
+              <p style="margin: 0.25rem 0;">🚗 <strong>Biển số:</strong> ${booking.licensePlate || "N/A"}</p>
+              <p style="margin: 0.25rem 0;">🔧 <strong>Dịch vụ:</strong> ${booking.serviceName || "N/A"}</p>
+              <p style="margin: 0.25rem 0; color: #0f766e; font-weight: bold;">💰 <strong>Giá:</strong> ${formatCurrency(booking.totalPrice)}</p>
+              
+              <div style="margin-top: 0.75rem; border-top: 1px dashed #e2e8f0; padding-top: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                <label style="font-size: 0.9rem; color: #64748b;" for="status-${bookingId}">Đổi trạng thái:</label>
+                <select class="form-select form-select-sm status-updater" data-id="${bookingId}" id="status-${bookingId}" style="padding: 0.25rem; border-radius: 4px; border: 1px solid #cbd5e1;">
+                  <option value="PENDING" ${statusLower === "pending" ? "selected" : ""}>Chờ xử lý</option>
+                  <option value="CONFIRMED" ${statusLower === "confirmed" ? "selected" : ""}>Đã xác nhận</option>
+                  <option value="COMPLETED" ${statusLower === "completed" ? "selected" : ""}>Hoàn thành</option>
+                  <option value="CANCELLED" ${statusLower === "cancelled" ? "selected" : ""}>Hủy bỏ</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    // 5. Lắng nghe sự kiện đổi trạng thái từ Dropdown select
+    document.querySelectorAll(".status-updater").forEach((select) => {
+      select.addEventListener("change", async (e) => {
+        const bookingId = e.target.dataset.id;
+        const newStatus = e.target.value;
+        await updateScheduleStatus(bookingId, newStatus);
+      });
+    });
+  } catch (error) {
+    console.error("Lỗi khi tải lịch trình hôm nay:", error);
+    scheduleContainer.innerHTML = `<div class="text-center text-danger">Có lỗi xảy ra khi tải danh sách lịch trình.</div>`;
+  }
 }
 
-function updateScheduleStatus(id, status) {
-  let schedule = loadFromStorage("staffSchedule", [...MOCK_DATA.staffSchedule]);
-  schedule = schedule.map((s) => (s.id === id ? { ...s, status } : s));
-  saveToStorage("staffSchedule", schedule);
-  showToast("Cập nhật lịch thành công!");
-  renderStaffSchedule();
+async function updateScheduleStatus(bookingId, newStatus) {
+  try {
+    const userStr = localStorage.getItem("autowash_user");
+    const token = userStr ? JSON.parse(userStr).token : "";
+
+    // 1. Xác định đúng API endpoint (PUT) dựa theo trạng thái được chọn từ dropdown
+    let url = "";
+    if (newStatus === "CONFIRMED") {
+      url = `http://localhost:8080/api/v1/bookings/${bookingId}/confirm-arrival`;
+    } else if (newStatus === "COMPLETED") {
+      url = `http://localhost:8080/api/v1/bookings/${bookingId}/complete`;
+    } else if (newStatus === "CANCELLED") {
+      url = `http://localhost:8080/api/v1/bookings/${bookingId}/cancel`;
+    } else {
+      showToast(
+        "Không hỗ trợ chuyển về trạng thái chờ xử lý (PENDING) từ đây!",
+      );
+      renderStaffSchedule(); // Reset lại giao diện dropdown về giá trị cũ
+      return;
+    }
+
+    // 2. Gửi request PUT lên Server kèm token bảo mật
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.ok) {
+      showToast("Cập nhật trạng thái thành công!");
+      await renderStaffSchedule(); // Tải lại danh sách lịch trình để đồng bộ UI
+    } else {
+      const errData = await response.json().catch(() => ({}));
+      showToast(
+        errData.message || "Cập nhật trạng thái thất bại. Vui lòng thử lại!",
+      );
+      await renderStaffSchedule();
+    }
+  } catch (error) {
+    console.error("Lỗi kết nối khi cập nhật trạng thái:", error);
+    showToast("Không thể kết nối đến máy chủ.");
+    await renderStaffSchedule();
+  }
 }
 
 function setUserNav(customer) {
@@ -1729,14 +1857,19 @@ async function loadHeaderUserInfoFromAPI() {
       document.getElementById("navUserAvatar") ||
       document.querySelector(".navbar .user-avatar");
 
-    // 1. KIỂM TRA NẾU LÀ ADMIN
-    // (Giả sử object user có lưu role là 'admin' hoặc user.role === 'admin')
-    if (user.role === "admin" || user.isAdmin) {
+    //1. Kiểm tra nếu là ADMIN hoặc STAFF (Không gọi API khách hàng)
+    if (user.role === "admin" || user.isAdmin || user.role === "staff") {
       if (nameEl)
-        nameEl.textContent = user.name || user.fullName || "Quản trị viên";
-      if (tierEl) tierEl.style.display = "none"; // Ẩn hiển thị Hạng (BRONZE/SILVER) đối với Admin
-      if (avatarEl) avatarEl.textContent = "AD"; // Hoặc lấy chữ cái đầu của tên Admin
-      return; // Dừng hàm tại đây, KHÔNG gọi API của customer
+        nameEl.textContent =
+          user.name ||
+          user.fullName ||
+          (user.role === "admin" ? "Quản trị viên" : "Nhân viên");
+      if (tierEl) tierEl.style.display = "none"; // Ẩn hiển thị Hạng đối với Admin & Staff
+      if (avatarEl) {
+        const displayName = user.name || user.fullName || "NV";
+        avatarEl.textContent = displayName.substring(0, 2).toUpperCase();
+      }
+      return;
     }
 
     // 2. NẾU LÀ CUSTOMER, GỌI API LẤY PROFILE NHƯ CŨ
@@ -1921,3 +2054,33 @@ async function cancelBooking(bookingId) {
 window.confirmArrival = confirmArrival;
 window.completeBooking = completeBooking;
 window.cancelBooking = cancelBooking;
+
+function adjustSidebarForRole() {
+  const userStr = localStorage.getItem("autowash_user");
+  if (!userStr) return;
+  const user = JSON.parse(userStr);
+
+  if (user.role === "staff") {
+    // 1. Cập nhật vai trò hiển thị
+    const sidebarRole = document.querySelector(".sidebar-role");
+    if (sidebarRole) sidebarRole.textContent = "Nhân viên";
+
+    // 2. Cấu hình lại menu Sidebar cho Staff (CHỈ hiển thị 2 trang dưới đây)
+    const sidebarNav = document.querySelector(".sidebar-nav ul");
+    if (sidebarNav) {
+      const currentPage = document.body.dataset.page;
+      sidebarNav.innerHTML = `
+        <li>
+          <a href="staff-schedule.html" class="${currentPage === "staff-schedule" ? "active" : ""}">
+            <span class="nav-icon">📅</span>Lịch Trình Hôm Nay
+          </a>
+        </li>
+        <li>
+          <a href="walkin-booking.html" class="${currentPage === "walkin-booking" ? "active" : ""}">
+            <span class="nav-icon">📝</span>Đặt Lịch Trực Tiếp
+          </a>
+        </li>
+      `;
+    }
+  }
+}

@@ -56,7 +56,7 @@
           <a
             href="#"
             onclick="
-              logout();
+              handleLogout();
               return false;
             "
             >🚪 Đăng xuất</a
@@ -69,7 +69,6 @@
             <button type="button" class="sidebar-toggle" aria-label="Menu">
               ☰
             </button>
-            <!-- Lưu ý: Đổi thẻ <h2> theo đúng tên của từng trang (Dashboard, Xe của tôi, Loyalty, Khuyến mãi) -->
             <div class="navbar-title"><h2>Booking History</h2></div>
           </div>
           <div class="navbar-right">
@@ -98,9 +97,9 @@
             <table class="table" id="bookingsTable">
               <thead>
                 <tr>
-                  <th>Mã</th>
                   <th>Ngày</th>
-                  <th>Giờ</th>
+                  <th>Giờ bắt đầu</th>
+                  <th>Giờ kết thúc</th>
                   <th>Xe</th>
                   <th>Dịch vụ</th>
                   <th>Trạng thái</th>

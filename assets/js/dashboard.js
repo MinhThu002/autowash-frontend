@@ -287,15 +287,20 @@ async function renderBookingHistory() {
         };
         const statusUi = statusMap[b.status] || b.status.toLowerCase();
 
+        // Xử lý hiển thị giờ bắt đầu và kết thúc (cắt lấy HH:mm)
+        const startTimeStr = b.startTime
+          ? b.startTime.substring(0, 5)
+          : "--:--";
+        const endTimeStr = b.endTime ? b.endTime.substring(0, 5) : "--:--";
+
         return `<tr data-status="${statusUi}" data-date="${b.bookingDate}">
-        <td><strong>#${b.id}</strong></td>
         <td>${formatDate(b.bookingDate)}</td>
-        <td>${b.createdAt.substring(0, 5)}</td>
+        <td>${startTimeStr}</td>
+        <td>${endTimeStr}</td>
         <td>${b.licensePlate}</td>
         <td>${b.serviceName}</td>
         <td>${getStatusBadge(statusUi)}</td>
         <td>${formatCurrency(b.totalPrice)}</td>
-        <!-- Đã xóa cột Điểm ở đây -->
       </tr>`;
       })
       .join("");
@@ -842,7 +847,7 @@ async function renderAdminBookings() {
     // Map dữ liệu API vào Table HTML
     tbody.innerHTML = bookings
       .map((b) => {
-        // Đảm bảo đồng bộ hóa chữ thường với thuộc tính data-status phục vụ bộ lọc của bạn
+        // Đảm bảo đồng bộ hóa chữ thường với thuộc tính data-status phục vụ bộ lọc
         const statusLower = b.status ? b.status.toLowerCase() : "pending";
         const bookingId = b.bookingId || b.id;
 
@@ -863,13 +868,25 @@ async function renderAdminBookings() {
           actionButtons = `<span class="text-muted">Đã kết thúc</span>`;
         }
 
+        // --- BẮT ĐẦU CẬP NHẬT: Xử lý hiển thị giờ bắt đầu và giờ kết thúc ---
+        let timeDisplay = "-";
+        if (b.startTime && b.endTime) {
+          // Cắt lấy 5 ký tự đầu (HH:mm) để hiển thị định dạng "08:00 - 09:00"
+          timeDisplay = `${b.startTime.substring(0, 5)} - ${b.endTime.substring(0, 5)}`;
+        } else if (b.startTime) {
+          timeDisplay = b.startTime.substring(0, 5);
+        } else if (b.startSlotName) {
+          timeDisplay = b.startSlotName;
+        }
+        // --- KẾT THÚC CẬP NHẬT ---
+
         // Khớp cấu trúc các cột với <thead> trong file admin-bookings.html
         return `<tr data-status="${statusLower}" data-id="${bookingId}">
         <td><strong>${b.customerName || b.fullName || "Khách vãng lai"}</strong></td>
         <td>${b.licensePlate || "-"}</td>
         <td>${b.serviceName || "Dịch vụ"}</td>
         <td>${formatDate(b.bookingDate)}</td>
-        <td>${b.startTime ? b.startTime.substring(0, 5) : b.startSlotName || "-"}</td>
+        <td>${timeDisplay}</td> <!-- Hiển thị chuỗi thời gian đã được định dạng -->
         <td>${getStatusBadge(statusLower)}</td>
         <td>${formatCurrency(b.totalPrice)}</td>
         <td class="actions">
@@ -879,7 +896,7 @@ async function renderAdminBookings() {
       })
       .join("");
 
-    // Kích hoạt bộ lọc trạng thái có sẵn của trang[cite: 25, 26]
+    // Kích hoạt bộ lọc trạng thái có sẵn của trang
     filterTable("adminBookingsTable", {
       status: document.getElementById("filterStatus")?.value,
     });

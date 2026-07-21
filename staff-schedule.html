@@ -25,6 +25,11 @@
                 ><span class="nav-icon">📋</span>Lịch hôm nay</a
               >
             </li>
+            <li>
+              <a href="walkin-booking.html"
+                ><span class="nav-icon">📝</span>Walk-in</a
+              >
+            </li>
           </ul>
         </nav>
         <div class="sidebar-footer">
@@ -51,15 +56,54 @@
               <div class="user-avatar">NA</div>
               <div class="user-info">
                 <div class="user-name">User</div>
-                <div class="user-tier">Member</div>
+                <div class="user-tier">Staff</div>
               </div>
             </div>
           </div>
         </header>
         <div class="page-content">
-          <p class="text-muted" style="margin-bottom: 1rem">
-            Lịch rửa xe ngày 19/5/2026
-          </p>
+          <div class="page-intro">
+            <div>
+              <h3 class="page-intro-title" id="scheduleDateTitle">
+                Lịch trong ngày
+              </h3>
+              <p class="text-muted" id="scheduleDateSub">
+                Đang tải ngày hôm nay…
+              </p>
+            </div>
+            <div class="page-intro-actions">
+              <a href="walkin-booking.html" class="btn btn-primary"
+                >+ Walk-in</a
+              >
+              <button
+                type="button"
+                class="btn btn-secondary"
+                onclick="renderStaffSchedule()"
+              >
+                Làm mới
+              </button>
+            </div>
+          </div>
+
+          <div class="stats-grid staff-day-stats" id="staffDayStats">
+            <div class="stat-card compact">
+              <div class="stat-label">Tổng lịch</div>
+              <div class="stat-value" id="stTotal">0</div>
+            </div>
+            <div class="stat-card compact">
+              <div class="stat-label">Chờ xử lý</div>
+              <div class="stat-value" id="stPending">0</div>
+            </div>
+            <div class="stat-card compact">
+              <div class="stat-label">Đã xác nhận</div>
+              <div class="stat-value" id="stConfirmed">0</div>
+            </div>
+            <div class="stat-card compact">
+              <div class="stat-label">Hoàn thành</div>
+              <div class="stat-value" id="stCompleted">0</div>
+            </div>
+          </div>
+
           <div class="schedule-timeline" id="scheduleList"></div>
         </div>
       </main>

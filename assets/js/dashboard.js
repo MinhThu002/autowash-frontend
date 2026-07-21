@@ -649,8 +649,7 @@ async function renderAdminDashboard() {
   if (!requireAuth(["admin"])) return;
 
   try {
-    const userStr = localStorage.getItem("autowash_user");
-    const token = userStr ? JSON.parse(userStr).token : "";
+    const token = getAuthToken();
 
     // Gọi API thống kê Dashboard
     const response = await fetch("http://localhost:8080/dashboard", {
@@ -1248,34 +1247,30 @@ function updateStaffDayStats(bookings) {
 }
 
 async function renderStaffSchedule() {
-  // Chỉ cho phép staff và admin truy cập trang này
   if (!requireAuth(["staff", "admin"])) return;
 
   const scheduleContainer = document.querySelector("#scheduleList");
   if (!scheduleContainer) return;
 
-  // 1. Lấy ngày hôm nay định dạng YYYY-MM-DD và DD/MM/YYYY để hiển thị động
   const today = new Date();
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, "0");
   const dd = String(today.getDate()).padStart(2, "0");
-  const todayStr = `${yyyy}-${mm}-${dd}`; // Ví dụ: "2026-07-16"
+  const todayStr = `${yyyy}-${mm}-${dd}`;
   const todayDisplay = `${dd}/${mm}/${yyyy}`;
 
-  // Cập nhật text hiển thị ngày động trên UI
-  const dateTextEl = document.querySelector(".page-content .text-muted");
-  if (dateTextEl) {
-    dateTextEl.textContent = `Lịch rửa xe ngày ${todayDisplay}`;
-  }
+  const titleEl = document.getElementById("scheduleDateTitle");
+  const subEl = document.getElementById("scheduleDateSub");
+  if (titleEl) titleEl.textContent = `Lịch ngày ${todayDisplay}`;
+  if (subEl)
+    subEl.textContent =
+      "Xác nhận khách đến, hoàn thành và thu tiền ngay trên timeline.";
 
   scheduleContainer.innerHTML =
-    '<div class="text-center">Đang tải lịch trình...</div>';
+    '<div class="empty-state"><p>Đang tải lịch trình...</p></div>';
 
   try {
-    const userStr = localStorage.getItem("autowash_user");
-    const token = userStr ? JSON.parse(userStr).token : "";
-
-    // 2. Gọi API chuẩn của hệ thống kèm Token bảo mật
+    const token = getAuthToken();
     const response = await fetch("http://localhost:8080/api/v1/bookings", {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1285,23 +1280,27 @@ async function renderStaffSchedule() {
     if (!response.ok) throw new Error("Không thể lấy dữ liệu lịch trình.");
 
     const bookings = await response.json();
+    const todayBookings = bookings
+      .filter((booking) => {
+        if (!booking.bookingDate) return false;
+        return booking.bookingDate.split("T")[0] === todayStr;
+      })
+      .sort((a, b) =>
+        String(a.startTime || "").localeCompare(String(b.startTime || "")),
+      );
 
-    // 3. Lọc danh sách: Chỉ lấy booking hôm nay
-    const todayBookings = bookings.filter((booking) => {
-      if (!booking.bookingDate) return false;
-      const bookingDate = booking.bookingDate.split("T")[0];
-      return bookingDate === todayStr;
-    });
+    updateStaffDayStats(todayBookings);
 
     if (todayBookings.length === 0) {
       scheduleContainer.innerHTML = `
-        <div class="empty-state" style="text-align: center; padding: 2rem;">
-          <p class="text-muted">Hôm nay (${todayDisplay}) không có lịch đặt xe nào.</p>
+        <div class="empty-state">
+          <div class="icon">📋</div>
+          <p>Hôm nay (${todayDisplay}) chưa có lịch nào.</p>
+          <a href="walkin-booking.html" class="btn btn-primary" style="margin-top:1rem">Tạo walk-in</a>
         </div>`;
       return;
     }
 
-    // 4. Render danh sách dạng timeline card động thích hợp cấu trúc HTML gốc
     scheduleContainer.innerHTML = todayBookings
       .map((booking) => {
         const bookingId = booking.bookingId || booking.id;
@@ -1320,24 +1319,21 @@ async function renderStaffSchedule() {
         }
 
         return `
-          <div class="timeline-item" style="display: flex; gap: 1.5rem; margin-bottom: 1.5rem; border-left: 3px solid #007bff; padding-left: 1rem;">
-            <div class="timeline-time" style="min-width: 60px; font-weight: bold; color: #007bff; font-size: 1.1rem;">
-              ${timeStr}
-            </div>
-            <div class="timeline-content card" style="flex: 1; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">
-                  ${booking.customerName || booking.fullName || "Khách vãng lai"}
-                </h4>
+          <div class="schedule-card" data-status="${statusLower}">
+            <div class="schedule-time">${timeStr}</div>
+            <div>
+              <div class="schedule-card-top">
+                <h4>${booking.customerName || booking.fullName || "Khách vãng lai"}</h4>
                 ${getStatusBadge(statusLower)}
               </div>
-              <p style="margin: 0.25rem 0;">🚗 <strong>Biển số:</strong> ${booking.licensePlate || "N/A"}</p>
-              <p style="margin: 0.25rem 0;">🔧 <strong>Dịch vụ:</strong> ${booking.serviceName || "N/A"}</p>
-              <p style="margin: 0.25rem 0; color: #0f766e; font-weight: bold;">💰 <strong>Giá:</strong> ${formatCurrency(booking.totalPrice)}</p>
-              
-              <div style="margin-top: 0.75rem; border-top: 1px dashed #e2e8f0; padding-top: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-                <label style="font-size: 0.9rem; color: #64748b;" for="status-${bookingId}">Đổi trạng thái:</label>
-                <select class="form-select form-select-sm status-updater" data-id="${bookingId}" id="status-${bookingId}" style="padding: 0.25rem; border-radius: 4px; border: 1px solid #cbd5e1;">
+              <div class="schedule-meta">
+                <span>🚗 ${booking.licensePlate || "N/A"}</span>
+                <span>🔧 ${booking.serviceName || "N/A"}</span>
+                <span>💰 ${formatCurrency(booking.totalPrice)}</span>
+              </div>
+              <div class="schedule-actions">
+                <label for="status-${bookingId}">Trạng thái</label>
+                <select class="status-updater" data-id="${bookingId}" id="status-${bookingId}">
                   <option value="PENDING" ${statusLower === "pending" ? "selected" : ""}>Chờ xử lý</option>
                   <option value="CONFIRMED" ${statusLower === "confirmed" ? "selected" : ""}>Đã xác nhận</option>
                   <option value="COMPLETED" ${statusLower === "completed" ? "selected" : ""}>Hoàn thành</option>
@@ -1345,22 +1341,19 @@ async function renderStaffSchedule() {
                 </select>
               </div>
             </div>
-          </div>
-        `;
+          </div>`;
       })
       .join("");
 
-    // 5. Lắng nghe sự kiện đổi trạng thái từ Dropdown select
     document.querySelectorAll(".status-updater").forEach((select) => {
       select.addEventListener("change", async (e) => {
-        const bookingId = e.target.dataset.id;
-        const newStatus = e.target.value;
-        await updateScheduleStatus(bookingId, newStatus);
+        await updateScheduleStatus(e.target.dataset.id, e.target.value);
       });
     });
   } catch (error) {
     console.error("Lỗi khi tải lịch trình hôm nay:", error);
-    scheduleContainer.innerHTML = `<div class="text-center text-danger">Có lỗi xảy ra khi tải danh sách lịch trình.</div>`;
+    updateStaffDayStats([]);
+    scheduleContainer.innerHTML = `<div class="empty-state"><p class="text-danger">Không tải được lịch trình.</p></div>`;
   }
 }
 
@@ -1429,13 +1422,18 @@ function setUserNav(customer) {
 function renderBarChart(containerId, data, labels, small) {
   const container = document.getElementById(containerId);
   if (!container) return;
-  const max = Math.max(...data);
+  if (!data || !data.length) {
+    container.innerHTML =
+      '<p class="text-center text-muted">Chưa có dữ liệu</p>';
+    return;
+  }
+  const max = Math.max(...data.map(Number), 1);
   container.innerHTML =
     '<div class="chart-container">' +
     data
       .map(
         (v, i) =>
-          `<div class="chart-bar" style="height:${Math.round((v / max) * 100)}%" data-value="${small ? v : formatCurrency(v)}"></div>`,
+          `<div class="chart-bar" style="height:${Math.round((Number(v) / max) * 100)}%" data-value="${small ? v : formatCurrency(v)}"></div>`,
       )
       .join("") +
     '</div><div class="chart-labels">' +
@@ -2238,6 +2236,7 @@ async function cancelBooking(bookingId) {
 window.confirmArrival = confirmArrival;
 window.completeBooking = completeBooking;
 window.cancelBooking = cancelBooking;
+window.renderStaffSchedule = renderStaffSchedule;
 
 function adjustSidebarForRole() {
   const userStr = localStorage.getItem("autowash_user");

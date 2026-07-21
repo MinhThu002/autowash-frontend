@@ -40,16 +40,18 @@ function adminSidebar(active) {
     ['admin-loyalty-tiers.html', '🏆', 'Hạng TV'],
     ['admin-promotions.html', '🎁', 'Khuyến mãi'],
     ['admin-rewards.html', '🎖️', 'Quà tặng'],
-    ['admin-analytics.html', '📈', 'Analytics']
+    ['admin-analytics.html', '📈', 'Analytics'],
+    ['admin-staff.html', '🧑‍💼', 'Nhân viên'],
+    ['walkin-booking.html', '📝', 'Walk-in']
   ];
   const links = items.map(([h, ic, lb]) =>
     `<li><a href="${h}" class="${active === h ? 'active' : ''}"><span class="nav-icon">${ic}</span>${lb}</a></li>`
   ).join('');
-  return `<aside class="sidebar"><div class="sidebar-header"><a href="index.html" class="sidebar-logo">🚿 Auto<span>Wash</span> Pro</a><div class="sidebar-role">Quản trị</div></motion><nav class="sidebar-nav"><ul>${links}</ul></nav><div class="sidebar-footer"><a href="#" onclick="logout();return false">🚪 Đăng xuất</a></div></aside>`;
+  return `<aside class="sidebar"><div class="sidebar-header"><a href="index.html" class="sidebar-logo">🚿 Auto<span>Wash</span> Pro</a><div class="sidebar-role">Quản trị</div></div><nav class="sidebar-nav"><ul>${links}</ul></nav><div class="sidebar-footer"><a href="#" onclick="logout();return false">🚪 Đăng xuất</a></div></aside>`;
 }
 
 function staffSidebar() {
-  return `<aside class="sidebar"><div class="sidebar-header"><a href="index.html" class="sidebar-logo">🚿 Auto<span>Wash</span> Pro</a><div class="sidebar-role">Nhân viên</div></div><nav class="sidebar-nav"><ul><li><a href="staff-schedule.html" class="active"><span class="nav-icon">📋</span>Lịch hôm nay</a></li></ul></nav><div class="sidebar-footer"><a href="#" onclick="logout();return false">🚪 Đăng xuất</a></motion></aside>`;
+  return `<aside class="sidebar"><div class="sidebar-header"><a href="index.html" class="sidebar-logo">🚿 Auto<span>Wash</span> Pro</a><div class="sidebar-role">Nhân viên</div></div><nav class="sidebar-nav"><ul><li><a href="staff-schedule.html" class="active"><span class="nav-icon">📋</span>Lịch hôm nay</a></li><li><a href="walkin-booking.html"><span class="nav-icon">📝</span>Walk-in</a></li></ul></nav><div class="sidebar-footer"><a href="#" onclick="logout();return false">🚪 Đăng xuất</a></div></aside>`;
 }
 
 function layout(title, sidebar, body, extra, dataPage) {

@@ -342,6 +342,48 @@
   font-size: 0.8125rem;
 }
 
+/* Page intro */
+.page-intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.page-intro-title {
+  font-size: 1.15rem;
+  margin-bottom: 0.25rem;
+}
+
+.page-intro-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.table-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.table-card .table-responsive {
+  padding: 0;
+}
+
+.stat-card.compact {
+  padding: 0.9rem 1rem;
+}
+
+.stat-card.compact .stat-value {
+  font-size: 1.35rem;
+}
+
+.staff-day-stats {
+  margin-bottom: 1.25rem;
+}
+
 /* Analytics */
 .analytics-grid {
   display: grid;

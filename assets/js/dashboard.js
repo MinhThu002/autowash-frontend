@@ -18,6 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
     "admin-loyalty-tiers": renderAdminTiers,
     "admin-promotions": renderAdminPromotions,
     "admin-rewards": renderAdminRewards,
+    "admin-staff": renderAdminStaff,
     "staff-schedule": renderStaffSchedule,
   };
   let loadedServices = [];
@@ -126,8 +127,7 @@ function renderVehiclesPage() {
   const user = requireAuth(["customer"]);
   if (!user) return;
 
-  const customer = getCurrentCustomer();
-  setUserNav(customer);
+  loadHeaderUserInfoFromAPI();
   const list = document.getElementById("vehiclesList");
   const customerId = getLoggedInCustomerId();
 
@@ -199,6 +199,7 @@ async function saveVehicle(e) {
     closeModal("vehicleModal");
     showToast(vehicleId ? "Cập nhật xe thành công!" : "Thêm xe thành công!");
     await renderVehiclesPage();
+    await loadHeaderUserInfoFromAPI();
   } catch (error) {
     showToast(error.message || "Lưu xe thất bại.");
   }
@@ -239,6 +240,7 @@ async function deleteVehicle(id) {
     await window.AutoWashAPI.vehicles.remove(Number(id));
     showToast("Đã xóa xe.");
     await renderVehiclesPage();
+    await loadHeaderUserInfoFromAPI();
   } catch (error) {
     showToast(error.message || "Xóa xe thất bại.");
   }
@@ -729,6 +731,148 @@ async function renderAdminDashboard() {
   }
 }
 
+async function renderAdminStaff() {
+  if (!requireAuth(["admin"])) return;
+
+  const tbody = document.querySelector("#staffTable tbody");
+  if (!tbody) return;
+
+  tbody.innerHTML =
+    '<tr><td colspan="5" class="text-center text-muted">Đang tải…</td></tr>';
+
+  try {
+    const response = await fetch("http://localhost:8080/api/staff", {
+      headers: { Authorization: `Bearer ${getAuthToken()}` },
+    });
+    if (!response.ok) throw new Error("Không tải được danh sách nhân viên.");
+
+    const staffList = await response.json();
+    if (!Array.isArray(staffList) || staffList.length === 0) {
+      tbody.innerHTML =
+        '<tr><td colspan="5" class="text-center text-muted">Chưa có nhân viên nào.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = staffList
+      .map((s) => {
+        const id = s.id ?? s.adminId;
+        const name = s.fullName || "—";
+        const username = s.userName || s.username || "—";
+        return `<tr>
+          <td>${id}</td>
+          <td><strong>${name}</strong></td>
+          <td>${username}</td>
+          <td><span class="badge badge-confirmed">STAFF</span></td>
+          <td>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="editStaff(${id}, '${String(name).replace(/'/g, "\\'")}', '${String(username).replace(/'/g, "\\'")}')">Sửa</button>
+            <button type="button" class="btn btn-sm btn-danger" onclick="deleteStaff(${id})">Xóa</button>
+          </td>
+        </tr>`;
+      })
+      .join("");
+  } catch (error) {
+    console.error("Lỗi renderAdminStaff:", error);
+    tbody.innerHTML =
+      '<tr><td colspan="5" class="text-center text-danger">Không tải được dữ liệu.</td></tr>';
+    showToast(error.message || "Không tải được nhân viên.");
+  }
+}
+
+function openStaffModal() {
+  document.getElementById("staffModalTitle").textContent = "Thêm nhân viên";
+  document.getElementById("staffId").value = "";
+  document.getElementById("staffFullName").value = "";
+  document.getElementById("staffUsername").value = "";
+  document.getElementById("staffPassword").value = "";
+  document.getElementById("staffPassword").required = true;
+  document.getElementById("staffPasswordHint").textContent = "(bắt buộc)";
+  openModal("staffModal");
+}
+
+function editStaff(id, fullName, username) {
+  document.getElementById("staffModalTitle").textContent = "Sửa nhân viên";
+  document.getElementById("staffId").value = id;
+  document.getElementById("staffFullName").value = fullName || "";
+  document.getElementById("staffUsername").value = username || "";
+  document.getElementById("staffPassword").value = "";
+  document.getElementById("staffPassword").required = true;
+  document.getElementById("staffPasswordHint").textContent =
+    "(nhập mật khẩu mới)";
+  openModal("staffModal");
+}
+
+async function saveStaff(e) {
+  e.preventDefault();
+  if (!requireAuth(["admin"])) return;
+
+  const id = document.getElementById("staffId").value;
+  const payload = {
+    fullName: document.getElementById("staffFullName").value.trim(),
+    username: document.getElementById("staffUsername").value.trim(),
+    password: document.getElementById("staffPassword").value,
+  };
+
+  if (!payload.fullName || !payload.username || !payload.password) {
+    showToast("Vui lòng điền đầy đủ họ tên, username và mật khẩu.");
+    return;
+  }
+  if (payload.password.length < 6) {
+    showToast("Mật khẩu tối thiểu 6 ký tự.");
+    return;
+  }
+
+  try {
+    const url = id
+      ? `http://localhost:8080/api/staff/${id}`
+      : "http://localhost:8080/api/staff";
+    const response = await fetch(url, {
+      method: id ? "PUT" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getAuthToken()}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(err || "Lưu nhân viên thất bại.");
+    }
+    closeModal("staffModal");
+    showToast(
+      id ? "Cập nhật nhân viên thành công!" : "Thêm nhân viên thành công!",
+    );
+    await renderAdminStaff();
+  } catch (error) {
+    showToast(error.message || "Không lưu được nhân viên.");
+  }
+}
+
+async function deleteStaff(id) {
+  if (!requireAuth(["admin"])) return;
+  if (!confirm("Xóa tài khoản nhân viên này?")) return;
+
+  try {
+    const response = await fetch(`http://localhost:8080/api/staff/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${getAuthToken()}` },
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(err || "Xóa thất bại.");
+    }
+    showToast("Đã xóa nhân viên.");
+    await renderAdminStaff();
+  } catch (error) {
+    showToast(error.message || "Không xóa được nhân viên.");
+  }
+}
+
+window.openStaffModal = openStaffModal;
+window.editStaff = editStaff;
+window.saveStaff = saveStaff;
+window.deleteStaff = deleteStaff;
+window.renderAdminStaff = renderAdminStaff;
+
 function renderAdminCustomers() {
   if (!requireAuth(["admin"])) return;
 
@@ -1080,6 +1224,29 @@ function renderAdminRewards() {
     });
 }
 
+function getAuthToken() {
+  try {
+    const userStr = localStorage.getItem("autowash_user");
+    return userStr ? JSON.parse(userStr).token || "" : "";
+  } catch (e) {
+    return localStorage.getItem("autowash_token") || "";
+  }
+}
+
+function updateStaffDayStats(bookings) {
+  const count = (status) =>
+    bookings.filter((b) => String(b.status || "").toLowerCase() === status)
+      .length;
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+  set("stTotal", bookings.length);
+  set("stPending", count("pending"));
+  set("stConfirmed", count("confirmed"));
+  set("stCompleted", count("completed"));
+}
+
 async function renderStaffSchedule() {
   // Chỉ cho phép staff và admin truy cập trang này
   if (!requireAuth(["staff", "admin"])) return;
@@ -1141,9 +1308,16 @@ async function renderStaffSchedule() {
         const statusLower = booking.status
           ? booking.status.toLowerCase()
           : "pending";
-        const timeStr = booking.startTime
-          ? booking.startTime.substring(0, 5)
-          : booking.startSlotName || "--:--";
+
+        let timeStr = "--:--";
+        if (booking.startTime && booking.endTime) {
+          // Hiển thị theo định dạng "HH:mm - HH:mm"
+          timeStr = `${booking.startTime.substring(0, 5)} - ${booking.endTime.substring(0, 5)}`;
+        } else if (booking.startTime) {
+          timeStr = booking.startTime.substring(0, 5);
+        } else if (booking.startSlotName) {
+          timeStr = booking.startSlotName;
+        }
 
         return `
           <div class="timeline-item" style="display: flex; gap: 1.5rem; margin-bottom: 1.5rem; border-left: 3px solid #007bff; padding-left: 1rem;">
@@ -1884,7 +2058,7 @@ async function loadHeaderUserInfoFromAPI() {
       if (tierEl) tierEl.style.display = "none"; // Ẩn hiển thị Hạng đối với Admin & Staff
       if (avatarEl) {
         const displayName = user.name || user.fullName || "NV";
-        avatarEl.textContent = displayName.substring(0, 2).toUpperCase();
+        avatarEl.textContent = getUserInitials(displayName);
       }
       return;
     }
@@ -1911,14 +2085,7 @@ async function loadHeaderUserInfoFromAPI() {
     }
 
     if (avatarEl && profile.fullName) {
-      const nameParts = profile.fullName.trim().split(" ");
-      let initials = "";
-      if (nameParts.length >= 2) {
-        initials = nameParts[0][0] + nameParts[nameParts.length - 1][0];
-      } else {
-        initials = nameParts[0].substring(0, 2);
-      }
-      avatarEl.textContent = initials.toUpperCase();
+      avatarEl.textContent = getUserInitials(profile.fullName);
     }
   } catch (error) {
     console.error("Lỗi khi tải thông tin Header từ API:", error);

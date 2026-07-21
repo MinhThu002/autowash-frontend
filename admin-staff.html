@@ -1,14 +1,14 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dịch vụ - AutoWash Pro</title>
+    <title>Nhân viên - AutoWash Pro</title>
     <link rel="stylesheet" href="assets/css/style.css" />
     <link rel="stylesheet" href="assets/css/dashboard.css" />
     <link rel="stylesheet" href="assets/css/responsive.css" />
   </head>
-  <body data-page="admin-services">
+  <body data-page="admin-staff">
     <div class="app-layout">
       <div class="sidebar-overlay"></div>
       <aside class="sidebar">
@@ -21,43 +21,43 @@
         <nav class="sidebar-nav">
           <ul>
             <li>
-              <a href="admin-dashboard.html" class=""
+              <a href="admin-dashboard.html"
                 ><span class="nav-icon">📊</span>Dashboard</a
               >
             </li>
             <li>
-              <a href="admin-customers.html" class=""
+              <a href="admin-customers.html"
                 ><span class="nav-icon">👥</span>Khách hàng</a
               >
             </li>
             <li>
-              <a href="admin-bookings.html" class=""
+              <a href="admin-bookings.html"
                 ><span class="nav-icon">📅</span>Bookings</a
               >
             </li>
             <li>
-              <a href="admin-services.html" class=""
+              <a href="admin-services.html"
                 ><span class="nav-icon">🔧</span>Dịch vụ</a
               >
             </li>
             <li>
-              <a href="admin-loyalty-tiers.html" class=""
+              <a href="admin-loyalty-tiers.html"
                 ><span class="nav-icon">🏆</span>Hạng TV</a
               >
             </li>
             <li>
-              <a href="admin-promotions.html" class=""
+              <a href="admin-promotions.html"
                 ><span class="nav-icon">🎁</span>Khuyến mãi</a
               >
             </li>
             <li>
-              <a href="admin-rewards.html" class=""
+              <a href="admin-rewards.html"
                 ><span class="nav-icon">🎖️</span>Quà tặng</a
               >
             </li>
 
             <li>
-              <a href="admin-staff.html"
+              <a href="admin-staff.html" class="active"
                 ><span class="nav-icon">🧑‍💼</span>Nhân viên</a
               >
             </li>
@@ -85,82 +85,115 @@
             <button type="button" class="sidebar-toggle" aria-label="Menu">
               ☰
             </button>
-            <div class="navbar-title"><h2>Dịch vụ</h2></div>
+            <div class="navbar-title"><h2>Quản lý nhân viên</h2></div>
           </div>
           <div class="navbar-right">
             <div class="navbar-user">
               <div class="user-avatar">NA</div>
               <div class="user-info">
                 <div class="user-name">User</div>
-                <div class="user-tier">Member</div>
+                <div class="user-tier">Manager</div>
               </div>
             </div>
           </div>
         </header>
         <div class="page-content">
-          <div class="page-header">
-            <h2>Dịch vụ</h2>
-            <button class="btn btn-primary" onclick="openAddService()">
-              + Thêm dịch vụ
+          <div class="page-intro">
+            <div>
+              <h3 class="page-intro-title">Tài khoản Staff</h3>
+              <p class="text-muted">
+                Tạo / sửa / xóa tài khoản nhân viên (role STAFF) để vận hành tại
+                quầy.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="btn btn-primary"
+              onclick="openStaffModal()"
+            >
+              + Thêm nhân viên
             </button>
           </div>
-          <div class="card table-wrapper">
-            <table class="table" id="servicesTable">
-              <thead>
-                <tr>
-                  <th>Tên</th>
-                  <th>TG</th>
-                  <th>Giá</th>
-                  <th>Mô tả</th>
-                  <th>TT</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
+
+          <div class="card table-card">
+            <div class="table-responsive">
+              <table class="table" id="staffTable">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Họ tên</th>
+                    <th>Username</th>
+                    <th>Vai trò</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td colspan="5" class="text-center text-muted">
+                      Đang tải…
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div class="modal-overlay" id="serviceModal">
+
+          <div class="modal-overlay" id="staffModal">
             <div class="modal">
               <div class="modal-header">
-                <h3>Dịch vụ</h3>
-                <button class="modal-close" data-modal-close="serviceModal">
+                <h3 id="staffModalTitle">Thêm nhân viên</h3>
+                <button
+                  type="button"
+                  class="modal-close"
+                  data-modal-close="staffModal"
+                >
                   &times;
                 </button>
               </div>
-              <form id="serviceForm">
+              <form id="staffForm" onsubmit="saveStaff(event)">
                 <div class="modal-body">
-                  <input type="hidden" id="serviceId" />
+                  <input type="hidden" id="staffId" value="" />
                   <div class="form-group">
-                    <label>Tên</label><input id="serviceName" required />
+                    <label for="staffFullName">Họ tên</label>
+                    <input
+                      type="text"
+                      id="staffFullName"
+                      required
+                      placeholder="Nguyễn Văn A"
+                    />
                   </div>
                   <div class="form-group">
-                    <label>Thời lượng (phút)</label>
-                    <input type="number" id="serviceDuration" required />
+                    <label for="staffUsername">Username đăng nhập</label>
+                    <input
+                      type="text"
+                      id="staffUsername"
+                      required
+                      placeholder="staff01"
+                    />
                   </div>
                   <div class="form-group">
-                    <label>Giá</label
-                    ><input type="number" id="servicePrice" required />
-                  </div>
-                  <div class="form-group">
-                    <label>Mô tả</label
-                    ><textarea id="serviceDescription"></textarea>
-                  </div>
-                  <div class="form-group">
-                    <label>Trạng thái</label
-                    ><select id="serviceActive">
-                      <option value="true">Active</option>
-                      <option value="false">Inactive</option>
-                    </select>
+                    <label for="staffPassword"
+                      >Mật khẩu
+                      <span class="text-muted" id="staffPasswordHint"
+                        >(bắt buộc)</span
+                      ></label
+                    >
+                    <input
+                      type="password"
+                      id="staffPassword"
+                      placeholder="Tối thiểu 6 ký tự"
+                    />
                   </div>
                 </div>
                 <div class="modal-footer">
                   <button
                     type="button"
                     class="btn btn-secondary"
-                    data-modal-close="serviceModal"
+                    data-modal-close="staffModal"
                   >
-                    Hủy</button
-                  ><button type="submit" class="btn btn-primary">Lưu</button>
+                    Hủy
+                  </button>
+                  <button type="submit" class="btn btn-primary">Lưu</button>
                 </div>
               </form>
             </div>

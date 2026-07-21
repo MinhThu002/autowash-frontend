@@ -18,6 +18,8 @@ document.addEventListener("DOMContentLoaded", () => {
     "admin-loyalty-tiers": renderAdminTiers,
     "admin-promotions": renderAdminPromotions,
     "admin-rewards": renderAdminRewards,
+    "admin-analytics": renderAdminAnalytics,
+    "admin-staff": renderAdminStaff,
     "staff-schedule": renderStaffSchedule,
   };
   let loadedServices = [];
@@ -647,8 +649,7 @@ async function renderAdminDashboard() {
   if (!requireAuth(["admin"])) return;
 
   try {
-    const userStr = localStorage.getItem("autowash_user");
-    const token = userStr ? JSON.parse(userStr).token : "";
+    const token = getAuthToken();
 
     // Gọi API thống kê Dashboard
     const response = await fetch("http://localhost:8080/dashboard", {
@@ -728,6 +729,276 @@ async function renderAdminDashboard() {
     showToast("Không thể kết nối và tải dữ liệu tổng quan từ API.");
   }
 }
+
+async function renderAdminAnalytics() {
+  if (!requireAuth(["admin"])) return;
+
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+
+  try {
+    const response = await fetch("http://localhost:8080/dashboard", {
+      headers: { Authorization: `Bearer ${getAuthToken()}` },
+    });
+    if (!response.ok) throw new Error("Không tải được analytics.");
+    const d = await response.json();
+
+    setText("anRevenue", formatCurrency(d.totalRevenue || 0));
+    setText(
+      "anTotalBookings",
+      (d.totalBooking || 0).toLocaleString("vi-VN"),
+    );
+    setText(
+      "anTodayBookings",
+      (d.todayBooking || 0).toLocaleString("vi-VN"),
+    );
+    setText(
+      "anNewCustomers",
+      (d.newCustomers || 0).toLocaleString("vi-VN"),
+    );
+    setText(
+      "anRepeatCustomers",
+      (d.oldCustomers || 0).toLocaleString("vi-VN"),
+    );
+    setText(
+      "anActivePromos",
+      (d.activePromotion || 0).toLocaleString("vi-VN"),
+    );
+
+    if (d.monthlyRevenues && d.monthlyRevenues.length > 0) {
+      const revenueData = d.monthlyRevenues.map((r) => Number(r.totalRevenue) || 0);
+      const revenueLabels = d.monthlyRevenues.map(
+        (r) => `T${parseInt(String(r.yearMonth).substring(4, 6), 10)}`,
+      );
+      renderBarChart("anRevenueChart", revenueData, revenueLabels);
+      const last = revenueData[revenueData.length - 1] || 0;
+      const prev = revenueData[revenueData.length - 2] || 0;
+      const hint = document.getElementById("anRevenueHint");
+      if (hint) {
+        if (prev > 0) {
+          const delta = Math.round(((last - prev) / prev) * 100);
+          hint.textContent =
+            delta >= 0 ? `+${delta}% so với tháng trước` : `${delta}% so với tháng trước`;
+        } else {
+          hint.textContent = `${d.monthlyRevenues.length} tháng dữ liệu`;
+        }
+      }
+    } else {
+      setText("anRevenueHint", "");
+      const chart = document.getElementById("anRevenueChart");
+      if (chart)
+        chart.innerHTML =
+          '<p class="text-center text-muted">Chưa có dữ liệu doanh thu</p>';
+    }
+
+    if (d.loyaltyTierCustomers && d.loyaltyTierCustomers.length > 0) {
+      const tierData = {};
+      d.loyaltyTierCustomers.forEach((t) => {
+        tierData[t.tierName] = t.numberCustomer;
+      });
+      renderTierChart(tierData, "anTierChart");
+    } else {
+      const tierEl = document.getElementById("anTierChart");
+      if (tierEl)
+        tierEl.innerHTML =
+          '<p class="text-center text-muted">Chưa có dữ liệu hạng</p>';
+    }
+
+    const bars = document.getElementById("anServiceBars");
+    if (bars) {
+      const services = d.serviceCustomers || [];
+      if (!services.length) {
+        bars.innerHTML =
+          '<p class="text-muted text-center">Chưa có dữ liệu dịch vụ</p>';
+      } else {
+        const max = Math.max(
+          ...services.map((s) => Number(s.numberCustomer) || 0),
+          1,
+        );
+        bars.innerHTML = services
+          .map((s) => {
+            const count = Number(s.numberCustomer) || 0;
+            const pct = Math.round((count / max) * 100);
+            return `<div class="hbar-row">
+              <div class="hbar-label" title="${s.serviceName}">${s.serviceName}</div>
+              <div class="hbar-track"><div class="hbar-fill" style="width:${pct}%"></div></div>
+              <div class="hbar-value">${count} lượt</div>
+            </div>`;
+          })
+          .join("");
+      }
+    }
+
+    const insights = document.getElementById("anInsights");
+    if (insights) {
+      const totalCust =
+        (Number(d.newCustomers) || 0) + (Number(d.oldCustomers) || 0);
+      const topService =
+        (d.serviceCustomers && d.serviceCustomers[0]?.serviceName) || "—";
+      const topTier =
+        (d.loyaltyTierCustomers || [])
+          .slice()
+          .sort(
+            (a, b) =>
+              (Number(b.numberCustomer) || 0) - (Number(a.numberCustomer) || 0),
+          )[0]?.tierName || "—";
+      insights.innerHTML = `
+        <li><strong>Hôm nay:</strong> ${d.todayBooking || 0} booking đang trong hệ thống.</li>
+        <li><strong>Khách:</strong> ${d.newCustomers || 0} mới · ${d.oldCustomers || 0} quay lại${totalCust ? ` (tổng ${totalCust})` : ""}.</li>
+        <li><strong>Dịch vụ dẫn đầu:</strong> ${topService}.</li>
+        <li><strong>Hạng đông nhất:</strong> ${topTier}.</li>
+        <li><strong>KM / Quà active:</strong> ${d.activePromotion || 0} khuyến mãi · ${d.activeReward || 0} quà.</li>
+      `;
+    }
+  } catch (error) {
+    console.error("Lỗi renderAdminAnalytics:", error);
+    showToast("Không tải được trang Analytics.");
+  }
+}
+
+window.renderAdminAnalytics = renderAdminAnalytics;
+
+async function renderAdminStaff() {
+  if (!requireAuth(["admin"])) return;
+
+  const tbody = document.querySelector("#staffTable tbody");
+  if (!tbody) return;
+
+  tbody.innerHTML =
+    '<tr><td colspan="5" class="text-center text-muted">Đang tải…</td></tr>';
+
+  try {
+    const response = await fetch("http://localhost:8080/api/staff", {
+      headers: { Authorization: `Bearer ${getAuthToken()}` },
+    });
+    if (!response.ok) throw new Error("Không tải được danh sách nhân viên.");
+
+    const staffList = await response.json();
+    if (!Array.isArray(staffList) || staffList.length === 0) {
+      tbody.innerHTML =
+        '<tr><td colspan="5" class="text-center text-muted">Chưa có nhân viên nào.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = staffList
+      .map((s) => {
+        const id = s.id ?? s.adminId;
+        const name = s.fullName || "—";
+        const username = s.userName || s.username || "—";
+        return `<tr>
+          <td>${id}</td>
+          <td><strong>${name}</strong></td>
+          <td>${username}</td>
+          <td><span class="badge badge-confirmed">STAFF</span></td>
+          <td>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="editStaff(${id}, '${String(name).replace(/'/g, "\\'")}', '${String(username).replace(/'/g, "\\'")}')">Sửa</button>
+            <button type="button" class="btn btn-sm btn-danger" onclick="deleteStaff(${id})">Xóa</button>
+          </td>
+        </tr>`;
+      })
+      .join("");
+  } catch (error) {
+    console.error("Lỗi renderAdminStaff:", error);
+    tbody.innerHTML =
+      '<tr><td colspan="5" class="text-center text-danger">Không tải được dữ liệu.</td></tr>';
+    showToast(error.message || "Không tải được nhân viên.");
+  }
+}
+
+function openStaffModal() {
+  document.getElementById("staffModalTitle").textContent = "Thêm nhân viên";
+  document.getElementById("staffId").value = "";
+  document.getElementById("staffFullName").value = "";
+  document.getElementById("staffUsername").value = "";
+  document.getElementById("staffPassword").value = "";
+  document.getElementById("staffPassword").required = true;
+  document.getElementById("staffPasswordHint").textContent = "(bắt buộc)";
+  openModal("staffModal");
+}
+
+function editStaff(id, fullName, username) {
+  document.getElementById("staffModalTitle").textContent = "Sửa nhân viên";
+  document.getElementById("staffId").value = id;
+  document.getElementById("staffFullName").value = fullName || "";
+  document.getElementById("staffUsername").value = username || "";
+  document.getElementById("staffPassword").value = "";
+  document.getElementById("staffPassword").required = true;
+  document.getElementById("staffPasswordHint").textContent =
+    "(nhập mật khẩu mới)";
+  openModal("staffModal");
+}
+
+async function saveStaff(e) {
+  e.preventDefault();
+  if (!requireAuth(["admin"])) return;
+
+  const id = document.getElementById("staffId").value;
+  const payload = {
+    fullName: document.getElementById("staffFullName").value.trim(),
+    username: document.getElementById("staffUsername").value.trim(),
+    password: document.getElementById("staffPassword").value,
+  };
+
+  if (!payload.fullName || !payload.username || !payload.password) {
+    showToast("Vui lòng điền đầy đủ họ tên, username và mật khẩu.");
+    return;
+  }
+  if (payload.password.length < 6) {
+    showToast("Mật khẩu tối thiểu 6 ký tự.");
+    return;
+  }
+
+  try {
+    const url = id
+      ? `http://localhost:8080/api/staff/${id}`
+      : "http://localhost:8080/api/staff";
+    const response = await fetch(url, {
+      method: id ? "PUT" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getAuthToken()}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(err || "Lưu nhân viên thất bại.");
+    }
+    closeModal("staffModal");
+    showToast(id ? "Cập nhật nhân viên thành công!" : "Thêm nhân viên thành công!");
+    await renderAdminStaff();
+  } catch (error) {
+    showToast(error.message || "Không lưu được nhân viên.");
+  }
+}
+
+async function deleteStaff(id) {
+  if (!requireAuth(["admin"])) return;
+  if (!confirm("Xóa tài khoản nhân viên này?")) return;
+
+  try {
+    const response = await fetch(`http://localhost:8080/api/staff/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${getAuthToken()}` },
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(err || "Xóa thất bại.");
+    }
+    showToast("Đã xóa nhân viên.");
+    await renderAdminStaff();
+  } catch (error) {
+    showToast(error.message || "Không xóa được nhân viên.");
+  }
+}
+
+window.openStaffModal = openStaffModal;
+window.editStaff = editStaff;
+window.saveStaff = saveStaff;
+window.deleteStaff = deleteStaff;
+window.renderAdminStaff = renderAdminStaff;
 
 function renderAdminCustomers() {
   if (!requireAuth(["admin"])) return;
@@ -1080,35 +1351,55 @@ function renderAdminRewards() {
     });
 }
 
+function getAuthToken() {
+  try {
+    const userStr = localStorage.getItem("autowash_user");
+    return userStr ? JSON.parse(userStr).token || "" : "";
+  } catch (e) {
+    return localStorage.getItem("autowash_token") || "";
+  }
+}
+
+function updateStaffDayStats(bookings) {
+  const count = (status) =>
+    bookings.filter(
+      (b) => String(b.status || "").toLowerCase() === status,
+    ).length;
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+  set("stTotal", bookings.length);
+  set("stPending", count("pending"));
+  set("stConfirmed", count("confirmed"));
+  set("stCompleted", count("completed"));
+}
+
 async function renderStaffSchedule() {
-  // Chỉ cho phép staff và admin truy cập trang này
   if (!requireAuth(["staff", "admin"])) return;
 
   const scheduleContainer = document.querySelector("#scheduleList");
   if (!scheduleContainer) return;
 
-  // 1. Lấy ngày hôm nay định dạng YYYY-MM-DD và DD/MM/YYYY để hiển thị động
   const today = new Date();
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, "0");
   const dd = String(today.getDate()).padStart(2, "0");
-  const todayStr = `${yyyy}-${mm}-${dd}`; // Ví dụ: "2026-07-16"
+  const todayStr = `${yyyy}-${mm}-${dd}`;
   const todayDisplay = `${dd}/${mm}/${yyyy}`;
 
-  // Cập nhật text hiển thị ngày động trên UI
-  const dateTextEl = document.querySelector(".page-content .text-muted");
-  if (dateTextEl) {
-    dateTextEl.textContent = `Lịch rửa xe ngày ${todayDisplay}`;
-  }
+  const titleEl = document.getElementById("scheduleDateTitle");
+  const subEl = document.getElementById("scheduleDateSub");
+  if (titleEl) titleEl.textContent = `Lịch ngày ${todayDisplay}`;
+  if (subEl)
+    subEl.textContent =
+      "Xác nhận khách đến, hoàn thành và thu tiền ngay trên timeline.";
 
   scheduleContainer.innerHTML =
-    '<div class="text-center">Đang tải lịch trình...</div>';
+    '<div class="empty-state"><p>Đang tải lịch trình...</p></div>';
 
   try {
-    const userStr = localStorage.getItem("autowash_user");
-    const token = userStr ? JSON.parse(userStr).token : "";
-
-    // 2. Gọi API chuẩn của hệ thống kèm Token bảo mật
+    const token = getAuthToken();
     const response = await fetch("http://localhost:8080/api/v1/bookings", {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1118,23 +1409,27 @@ async function renderStaffSchedule() {
     if (!response.ok) throw new Error("Không thể lấy dữ liệu lịch trình.");
 
     const bookings = await response.json();
+    const todayBookings = bookings
+      .filter((booking) => {
+        if (!booking.bookingDate) return false;
+        return booking.bookingDate.split("T")[0] === todayStr;
+      })
+      .sort((a, b) =>
+        String(a.startTime || "").localeCompare(String(b.startTime || "")),
+      );
 
-    // 3. Lọc danh sách: Chỉ lấy booking hôm nay
-    const todayBookings = bookings.filter((booking) => {
-      if (!booking.bookingDate) return false;
-      const bookingDate = booking.bookingDate.split("T")[0];
-      return bookingDate === todayStr;
-    });
+    updateStaffDayStats(todayBookings);
 
     if (todayBookings.length === 0) {
       scheduleContainer.innerHTML = `
-        <div class="empty-state" style="text-align: center; padding: 2rem;">
-          <p class="text-muted">Hôm nay (${todayDisplay}) không có lịch đặt xe nào.</p>
+        <div class="empty-state">
+          <div class="icon">📋</div>
+          <p>Hôm nay (${todayDisplay}) chưa có lịch nào.</p>
+          <a href="walkin-booking.html" class="btn btn-primary" style="margin-top:1rem">Tạo walk-in</a>
         </div>`;
       return;
     }
 
-    // 4. Render danh sách dạng timeline card động thích hợp cấu trúc HTML gốc
     scheduleContainer.innerHTML = todayBookings
       .map((booking) => {
         const bookingId = booking.bookingId || booking.id;
@@ -1146,24 +1441,21 @@ async function renderStaffSchedule() {
           : booking.startSlotName || "--:--";
 
         return `
-          <div class="timeline-item" style="display: flex; gap: 1.5rem; margin-bottom: 1.5rem; border-left: 3px solid #007bff; padding-left: 1rem;">
-            <div class="timeline-time" style="min-width: 60px; font-weight: bold; color: #007bff; font-size: 1.1rem;">
-              ${timeStr}
-            </div>
-            <div class="timeline-content card" style="flex: 1; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">
-                  ${booking.customerName || booking.fullName || "Khách vãng lai"}
-                </h4>
+          <div class="schedule-card" data-status="${statusLower}">
+            <div class="schedule-time">${timeStr}</div>
+            <div>
+              <div class="schedule-card-top">
+                <h4>${booking.customerName || booking.fullName || "Khách vãng lai"}</h4>
                 ${getStatusBadge(statusLower)}
               </div>
-              <p style="margin: 0.25rem 0;">🚗 <strong>Biển số:</strong> ${booking.licensePlate || "N/A"}</p>
-              <p style="margin: 0.25rem 0;">🔧 <strong>Dịch vụ:</strong> ${booking.serviceName || "N/A"}</p>
-              <p style="margin: 0.25rem 0; color: #0f766e; font-weight: bold;">💰 <strong>Giá:</strong> ${formatCurrency(booking.totalPrice)}</p>
-              
-              <div style="margin-top: 0.75rem; border-top: 1px dashed #e2e8f0; padding-top: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-                <label style="font-size: 0.9rem; color: #64748b;" for="status-${bookingId}">Đổi trạng thái:</label>
-                <select class="form-select form-select-sm status-updater" data-id="${bookingId}" id="status-${bookingId}" style="padding: 0.25rem; border-radius: 4px; border: 1px solid #cbd5e1;">
+              <div class="schedule-meta">
+                <span>🚗 ${booking.licensePlate || "N/A"}</span>
+                <span>🔧 ${booking.serviceName || "N/A"}</span>
+                <span>💰 ${formatCurrency(booking.totalPrice)}</span>
+              </div>
+              <div class="schedule-actions">
+                <label for="status-${bookingId}">Trạng thái</label>
+                <select class="status-updater" data-id="${bookingId}" id="status-${bookingId}">
                   <option value="PENDING" ${statusLower === "pending" ? "selected" : ""}>Chờ xử lý</option>
                   <option value="CONFIRMED" ${statusLower === "confirmed" ? "selected" : ""}>Đã xác nhận</option>
                   <option value="COMPLETED" ${statusLower === "completed" ? "selected" : ""}>Hoàn thành</option>
@@ -1171,22 +1463,19 @@ async function renderStaffSchedule() {
                 </select>
               </div>
             </div>
-          </div>
-        `;
+          </div>`;
       })
       .join("");
 
-    // 5. Lắng nghe sự kiện đổi trạng thái từ Dropdown select
     document.querySelectorAll(".status-updater").forEach((select) => {
       select.addEventListener("change", async (e) => {
-        const bookingId = e.target.dataset.id;
-        const newStatus = e.target.value;
-        await updateScheduleStatus(bookingId, newStatus);
+        await updateScheduleStatus(e.target.dataset.id, e.target.value);
       });
     });
   } catch (error) {
     console.error("Lỗi khi tải lịch trình hôm nay:", error);
-    scheduleContainer.innerHTML = `<div class="text-center text-danger">Có lỗi xảy ra khi tải danh sách lịch trình.</div>`;
+    updateStaffDayStats([]);
+    scheduleContainer.innerHTML = `<div class="empty-state"><p class="text-danger">Không tải được lịch trình.</p></div>`;
   }
 }
 
@@ -1255,13 +1544,18 @@ function setUserNav(customer) {
 function renderBarChart(containerId, data, labels, small) {
   const container = document.getElementById(containerId);
   if (!container) return;
-  const max = Math.max(...data);
+  if (!data || !data.length) {
+    container.innerHTML =
+      '<p class="text-center text-muted">Chưa có dữ liệu</p>';
+    return;
+  }
+  const max = Math.max(...data.map(Number), 1);
   container.innerHTML =
     '<div class="chart-container">' +
     data
       .map(
         (v, i) =>
-          `<div class="chart-bar" style="height:${Math.round((v / max) * 100)}%" data-value="${small ? v : formatCurrency(v)}"></div>`,
+          `<div class="chart-bar" style="height:${Math.round((Number(v) / max) * 100)}%" data-value="${small ? v : formatCurrency(v)}"></div>`,
       )
       .join("") +
     '</div><div class="chart-labels">' +
@@ -2071,6 +2365,7 @@ async function cancelBooking(bookingId) {
 window.confirmArrival = confirmArrival;
 window.completeBooking = completeBooking;
 window.cancelBooking = cancelBooking;
+window.renderStaffSchedule = renderStaffSchedule;
 
 function adjustSidebarForRole() {
   const userStr = localStorage.getItem("autowash_user");

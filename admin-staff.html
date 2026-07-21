@@ -1,14 +1,14 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Quà tặng - AutoWash Pro</title>
+    <title>Nhân viên - AutoWash Pro</title>
     <link rel="stylesheet" href="assets/css/style.css" />
     <link rel="stylesheet" href="assets/css/dashboard.css" />
     <link rel="stylesheet" href="assets/css/responsive.css" />
   </head>
-  <body data-page="admin-rewards">
+  <body data-page="admin-staff">
     <div class="app-layout">
       <div class="sidebar-overlay"></div>
       <aside class="sidebar">
@@ -21,37 +21,37 @@
         <nav class="sidebar-nav">
           <ul>
             <li>
-              <a href="admin-dashboard.html" class=""
+              <a href="admin-dashboard.html"
                 ><span class="nav-icon">📊</span>Dashboard</a
               >
             </li>
             <li>
-              <a href="admin-customers.html" class=""
+              <a href="admin-customers.html"
                 ><span class="nav-icon">👥</span>Khách hàng</a
               >
             </li>
             <li>
-              <a href="admin-bookings.html" class=""
+              <a href="admin-bookings.html"
                 ><span class="nav-icon">📅</span>Bookings</a
               >
             </li>
             <li>
-              <a href="admin-services.html" class=""
+              <a href="admin-services.html"
                 ><span class="nav-icon">🔧</span>Dịch vụ</a
               >
             </li>
             <li>
-              <a href="admin-loyalty-tiers.html" class=""
+              <a href="admin-loyalty-tiers.html"
                 ><span class="nav-icon">🏆</span>Hạng TV</a
               >
             </li>
             <li>
-              <a href="admin-promotions.html" class=""
+              <a href="admin-promotions.html"
                 ><span class="nav-icon">🎁</span>Khuyến mãi</a
               >
             </li>
             <li>
-              <a href="admin-rewards.html" class=""
+              <a href="admin-rewards.html"
                 ><span class="nav-icon">🎖️</span>Quà tặng</a
               >
             </li>
@@ -61,7 +61,7 @@
               >
             </li>
             <li>
-              <a href="admin-staff.html"
+              <a href="admin-staff.html" class="active"
                 ><span class="nav-icon">🧑‍💼</span>Nhân viên</a
               >
             </li>
@@ -89,7 +89,7 @@
             <button type="button" class="sidebar-toggle" aria-label="Menu">
               ☰
             </button>
-            <div class="navbar-title"><h2>Quà tặng</h2></div>
+            <div class="navbar-title"><h2>Quản lý nhân viên</h2></div>
           </div>
           <div class="navbar-right">
             <div class="navbar-user">
@@ -102,99 +102,102 @@
           </div>
         </header>
         <div class="page-content">
-          <div class="page-header">
-            <h2>Reward Catalog</h2>
-            <button class="btn btn-primary" onclick="openAddReward()">
-              + Thêm quà
+          <div class="page-intro">
+            <div>
+              <h3 class="page-intro-title">Tài khoản Staff</h3>
+              <p class="text-muted">
+                Tạo / sửa / xóa tài khoản nhân viên (role STAFF) để vận hành tại
+                quầy.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="btn btn-primary"
+              onclick="openStaffModal()"
+            >
+              + Thêm nhân viên
             </button>
           </div>
-          <div class="card table-wrapper">
-            <table class="table" id="rewardsTable">
+
+          <div class="card table-card">
+            <div class="table-responsive">
+            <table class="table" id="staffTable">
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Tên quà</th>
-                  <th>Mô tả</th>
-                  <th>Điểm đổi</th>
-                  <th>Giảm giá</th>
-                  <th>Tồn kho</th>
-                  <th>Trạng thái</th>
+                  <th>Họ tên</th>
+                  <th>Username</th>
+                  <th>Vai trò</th>
                   <th></th>
                 </tr>
               </thead>
-              <tbody></tbody>
-            </table>
+                <tbody>
+                  <tr>
+                    <td colspan="5" class="text-center text-muted">
+                      Đang tải…
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div class="modal-overlay" id="rewardModal">
+
+          <div class="modal-overlay" id="staffModal">
             <div class="modal">
               <div class="modal-header">
-                <h3 id="rewardModalTitle">Thêm quà tặng</h3>
-                <button class="modal-close" data-modal-close="rewardModal">
+                <h3 id="staffModalTitle">Thêm nhân viên</h3>
+                <button
+                  type="button"
+                  class="modal-close"
+                  data-modal-close="staffModal"
+                >
                   &times;
                 </button>
               </div>
-              <form id="rewardForm">
+              <form id="staffForm" onsubmit="saveStaff(event)">
                 <div class="modal-body">
-                  <input type="hidden" id="rewardId" />
+                  <input type="hidden" id="staffId" value="" />
                   <div class="form-group">
-                    <label for="rewardName">Tên quà</label
-                    ><input type="text" id="rewardName" required />
+                    <label for="staffFullName">Họ tên</label>
+                    <input
+                      type="text"
+                      id="staffFullName"
+                      required
+                      placeholder="Nguyễn Văn A"
+                    />
                   </div>
                   <div class="form-group">
-                    <label for="rewardDescription">Mô tả</label
-                    ><textarea id="rewardDescription"></textarea>
+                    <label for="staffUsername">Username đăng nhập</label>
+                    <input
+                      type="text"
+                      id="staffUsername"
+                      required
+                      placeholder="staff01"
+                    />
                   </div>
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label for="rewardPoints">Điểm cần đổi</label
-                      ><input
-                        type="number"
-                        id="rewardPoints"
-                        min="1"
-                        required
-                      />
-                    </div>
-                    <div class="form-row">
-                      <div class="form-group">
-                        <label for="rewardDiscountType">Loại giảm</label>
-                        <select id="rewardDiscountType">
-                          <option value="percent">%</option>
-                          <option value="fixed">Cố định (đ)</option>
-                        </select>
-                      </div>
-                      <div class="form-group">
-                        <label for="rewardDiscount">Giá trị giảm</label>
-                        <input
-                          type="number"
-                          id="rewardDiscount"
-                          min="0"
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label for="rewardStock">Tồn kho</label
-                      ><input type="number" id="rewardStock" min="0" required />
-                    </div>
-                    <div class="form-group">
-                      <label for="rewardActive">Trạng thái</label>
-                      <select id="rewardActive">
-                        <option value="true">Active</option>
-                        <option value="false">Inactive</option>
-                      </select>
-                    </div>
+                  <div class="form-group">
+                    <label for="staffPassword"
+                      >Mật khẩu
+                      <span class="text-muted" id="staffPasswordHint"
+                        >(bắt buộc)</span
+                      ></label
+                    >
+                    <input
+                      type="password"
+                      id="staffPassword"
+                      placeholder="Tối thiểu 6 ký tự"
+                    />
                   </div>
                 </div>
                 <div class="modal-footer">
                   <button
                     type="button"
                     class="btn btn-secondary"
-                    data-modal-close="rewardModal"
+                    data-modal-close="staffModal"
                   >
-                    Hủy</button
-                  ><button type="submit" class="btn btn-primary">Lưu</button>
+                    Hủy
+                  </button>
+                  <button type="submit" class="btn btn-primary">Lưu</button>
                 </div>
               </form>
             </div>

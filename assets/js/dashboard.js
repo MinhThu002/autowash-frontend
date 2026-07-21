@@ -18,7 +18,6 @@ document.addEventListener("DOMContentLoaded", () => {
     "admin-loyalty-tiers": renderAdminTiers,
     "admin-promotions": renderAdminPromotions,
     "admin-rewards": renderAdminRewards,
-    "admin-analytics": renderAdminAnalytics,
     "admin-staff": renderAdminStaff,
     "staff-schedule": renderStaffSchedule,
   };
@@ -128,8 +127,7 @@ function renderVehiclesPage() {
   const user = requireAuth(["customer"]);
   if (!user) return;
 
-  const customer = getCurrentCustomer();
-  setUserNav(customer);
+  loadHeaderUserInfoFromAPI();
   const list = document.getElementById("vehiclesList");
   const customerId = getLoggedInCustomerId();
 
@@ -201,6 +199,7 @@ async function saveVehicle(e) {
     closeModal("vehicleModal");
     showToast(vehicleId ? "Cập nhật xe thành công!" : "Thêm xe thành công!");
     await renderVehiclesPage();
+    await loadHeaderUserInfoFromAPI();
   } catch (error) {
     showToast(error.message || "Lưu xe thất bại.");
   }
@@ -241,6 +240,7 @@ async function deleteVehicle(id) {
     await window.AutoWashAPI.vehicles.remove(Number(id));
     showToast("Đã xóa xe.");
     await renderVehiclesPage();
+    await loadHeaderUserInfoFromAPI();
   } catch (error) {
     showToast(error.message || "Xóa xe thất bại.");
   }
@@ -730,136 +730,6 @@ async function renderAdminDashboard() {
   }
 }
 
-async function renderAdminAnalytics() {
-  if (!requireAuth(["admin"])) return;
-
-  const setText = (id, value) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = value;
-  };
-
-  try {
-    const response = await fetch("http://localhost:8080/dashboard", {
-      headers: { Authorization: `Bearer ${getAuthToken()}` },
-    });
-    if (!response.ok) throw new Error("Không tải được analytics.");
-    const d = await response.json();
-
-    setText("anRevenue", formatCurrency(d.totalRevenue || 0));
-    setText(
-      "anTotalBookings",
-      (d.totalBooking || 0).toLocaleString("vi-VN"),
-    );
-    setText(
-      "anTodayBookings",
-      (d.todayBooking || 0).toLocaleString("vi-VN"),
-    );
-    setText(
-      "anNewCustomers",
-      (d.newCustomers || 0).toLocaleString("vi-VN"),
-    );
-    setText(
-      "anRepeatCustomers",
-      (d.oldCustomers || 0).toLocaleString("vi-VN"),
-    );
-    setText(
-      "anActivePromos",
-      (d.activePromotion || 0).toLocaleString("vi-VN"),
-    );
-
-    if (d.monthlyRevenues && d.monthlyRevenues.length > 0) {
-      const revenueData = d.monthlyRevenues.map((r) => Number(r.totalRevenue) || 0);
-      const revenueLabels = d.monthlyRevenues.map(
-        (r) => `T${parseInt(String(r.yearMonth).substring(4, 6), 10)}`,
-      );
-      renderBarChart("anRevenueChart", revenueData, revenueLabels);
-      const last = revenueData[revenueData.length - 1] || 0;
-      const prev = revenueData[revenueData.length - 2] || 0;
-      const hint = document.getElementById("anRevenueHint");
-      if (hint) {
-        if (prev > 0) {
-          const delta = Math.round(((last - prev) / prev) * 100);
-          hint.textContent =
-            delta >= 0 ? `+${delta}% so với tháng trước` : `${delta}% so với tháng trước`;
-        } else {
-          hint.textContent = `${d.monthlyRevenues.length} tháng dữ liệu`;
-        }
-      }
-    } else {
-      setText("anRevenueHint", "");
-      const chart = document.getElementById("anRevenueChart");
-      if (chart)
-        chart.innerHTML =
-          '<p class="text-center text-muted">Chưa có dữ liệu doanh thu</p>';
-    }
-
-    if (d.loyaltyTierCustomers && d.loyaltyTierCustomers.length > 0) {
-      const tierData = {};
-      d.loyaltyTierCustomers.forEach((t) => {
-        tierData[t.tierName] = t.numberCustomer;
-      });
-      renderTierChart(tierData, "anTierChart");
-    } else {
-      const tierEl = document.getElementById("anTierChart");
-      if (tierEl)
-        tierEl.innerHTML =
-          '<p class="text-center text-muted">Chưa có dữ liệu hạng</p>';
-    }
-
-    const bars = document.getElementById("anServiceBars");
-    if (bars) {
-      const services = d.serviceCustomers || [];
-      if (!services.length) {
-        bars.innerHTML =
-          '<p class="text-muted text-center">Chưa có dữ liệu dịch vụ</p>';
-      } else {
-        const max = Math.max(
-          ...services.map((s) => Number(s.numberCustomer) || 0),
-          1,
-        );
-        bars.innerHTML = services
-          .map((s) => {
-            const count = Number(s.numberCustomer) || 0;
-            const pct = Math.round((count / max) * 100);
-            return `<div class="hbar-row">
-              <div class="hbar-label" title="${s.serviceName}">${s.serviceName}</div>
-              <div class="hbar-track"><div class="hbar-fill" style="width:${pct}%"></div></div>
-              <div class="hbar-value">${count} lượt</div>
-            </div>`;
-          })
-          .join("");
-      }
-    }
-
-    const insights = document.getElementById("anInsights");
-    if (insights) {
-      const totalCust =
-        (Number(d.newCustomers) || 0) + (Number(d.oldCustomers) || 0);
-      const topService =
-        (d.serviceCustomers && d.serviceCustomers[0]?.serviceName) || "—";
-      const topTier =
-        (d.loyaltyTierCustomers || [])
-          .slice()
-          .sort(
-            (a, b) =>
-              (Number(b.numberCustomer) || 0) - (Number(a.numberCustomer) || 0),
-          )[0]?.tierName || "—";
-      insights.innerHTML = `
-        <li><strong>Hôm nay:</strong> ${d.todayBooking || 0} booking đang trong hệ thống.</li>
-        <li><strong>Khách:</strong> ${d.newCustomers || 0} mới · ${d.oldCustomers || 0} quay lại${totalCust ? ` (tổng ${totalCust})` : ""}.</li>
-        <li><strong>Dịch vụ dẫn đầu:</strong> ${topService}.</li>
-        <li><strong>Hạng đông nhất:</strong> ${topTier}.</li>
-        <li><strong>KM / Quà active:</strong> ${d.activePromotion || 0} khuyến mãi · ${d.activeReward || 0} quà.</li>
-      `;
-    }
-  } catch (error) {
-    console.error("Lỗi renderAdminAnalytics:", error);
-    showToast("Không tải được trang Analytics.");
-  }
-}
-
-window.renderAdminAnalytics = renderAdminAnalytics;
-
 async function renderAdminStaff() {
   if (!requireAuth(["admin"])) return;
 
@@ -967,7 +837,9 @@ async function saveStaff(e) {
       throw new Error(err || "Lưu nhân viên thất bại.");
     }
     closeModal("staffModal");
-    showToast(id ? "Cập nhật nhân viên thành công!" : "Thêm nhân viên thành công!");
+    showToast(
+      id ? "Cập nhật nhân viên thành công!" : "Thêm nhân viên thành công!",
+    );
     await renderAdminStaff();
   } catch (error) {
     showToast(error.message || "Không lưu được nhân viên.");
@@ -1362,9 +1234,8 @@ function getAuthToken() {
 
 function updateStaffDayStats(bookings) {
   const count = (status) =>
-    bookings.filter(
-      (b) => String(b.status || "").toLowerCase() === status,
-    ).length;
+    bookings.filter((b) => String(b.status || "").toLowerCase() === status)
+      .length;
   const set = (id, value) => {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
@@ -1436,9 +1307,16 @@ async function renderStaffSchedule() {
         const statusLower = booking.status
           ? booking.status.toLowerCase()
           : "pending";
-        const timeStr = booking.startTime
-          ? booking.startTime.substring(0, 5)
-          : booking.startSlotName || "--:--";
+
+        let timeStr = "--:--";
+        if (booking.startTime && booking.endTime) {
+          // Hiển thị theo định dạng "HH:mm - HH:mm"
+          timeStr = `${booking.startTime.substring(0, 5)} - ${booking.endTime.substring(0, 5)}`;
+        } else if (booking.startTime) {
+          timeStr = booking.startTime.substring(0, 5);
+        } else if (booking.startSlotName) {
+          timeStr = booking.startSlotName;
+        }
 
         return `
           <div class="schedule-card" data-status="${statusLower}">
@@ -2178,7 +2056,7 @@ async function loadHeaderUserInfoFromAPI() {
       if (tierEl) tierEl.style.display = "none"; // Ẩn hiển thị Hạng đối với Admin & Staff
       if (avatarEl) {
         const displayName = user.name || user.fullName || "NV";
-        avatarEl.textContent = displayName.substring(0, 2).toUpperCase();
+        avatarEl.textContent = getUserInitials(displayName);
       }
       return;
     }
@@ -2205,14 +2083,7 @@ async function loadHeaderUserInfoFromAPI() {
     }
 
     if (avatarEl && profile.fullName) {
-      const nameParts = profile.fullName.trim().split(" ");
-      let initials = "";
-      if (nameParts.length >= 2) {
-        initials = nameParts[0][0] + nameParts[nameParts.length - 1][0];
-      } else {
-        initials = nameParts[0].substring(0, 2);
-      }
-      avatarEl.textContent = initials.toUpperCase();
+      avatarEl.textContent = getUserInitials(profile.fullName);
     }
   } catch (error) {
     console.error("Lỗi khi tải thông tin Header từ API:", error);

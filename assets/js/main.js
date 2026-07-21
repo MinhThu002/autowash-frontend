@@ -345,12 +345,15 @@ function requireAuth(roles) {
 
 function getUserInitials(name) {
   if (!name) return "?";
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .slice(-2)
-    .join("")
-    .toUpperCase();
+  const parts = name.trim().split(" ");
+
+  // Nếu tên có từ 2 chữ trở lên, lấy chữ cái đầu của từ đầu tiên và từ cuối cùng
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  // Nếu tên chỉ có 1 chữ, lấy tối đa 2 ký tự đầu tiên
+  return name.substring(0, 2).toUpperCase();
 }
 
 function filterTable(tableId, filters) {

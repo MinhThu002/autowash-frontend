@@ -476,7 +476,7 @@
 
 .schedule-card {
   display: grid;
-  grid-template-columns: 72px 1fr;
+  grid-template-columns: 110px 1fr;
   gap: 1rem;
   padding: 1rem 1.1rem;
   background: var(--white);
@@ -502,7 +502,7 @@
 }
 
 .schedule-card .schedule-time {
-  font-size: 1.15rem;
+  font-size: 0.95rem;
   line-height: 1.2;
 }
 

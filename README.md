@@ -141,14 +141,6 @@ flowchart TD
 - **Staff**
   - Xem lịch rửa xe trong ngày
 
-## Hạng thành viên (mock)
-
-| Hạng     | Lượt rửa | Chi tiêu | Pt rate | Cửa sổ đặt | Giảm |
-| -------- | -------- | -------- | ------- | ---------- | ---- |
-| Member   | 0        | 0đ       | 1.0x    | 7 ngày     | 0%   |
-| Silver   | 5        | 500K     | 1.2x    | 10 ngày    | 5%   |
-| Gold     | 15       | 2M       | 1.5x    | 12 ngày    | 10%  |
-| Platinum | 30       | 5M       | 2.0x    | 14 ngày    | 15%  |
 
 ## Cách chạy
 

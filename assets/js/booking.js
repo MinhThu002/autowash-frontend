@@ -166,9 +166,10 @@ async function populateBookingVehicles(
     renderTimeSlots(); // Gọi hiển thị khung giờ trống phù hợp với gói dịch vụ vừa chọn
     updatePriceSummary(); // Tính toán lại bảng giá xem trước
   });
-  document
-    .getElementById("bookingDate")
-    .addEventListener("change", renderTimeSlots);
+  document.getElementById("bookingDate").addEventListener("change", () => {
+    renderTimeSlots();
+    renderPromotions(currentTierName);
+  });
   document
     .getElementById("bookingPromotion")
     ?.addEventListener("change", (e) => {
@@ -286,7 +287,7 @@ async function renderPromotions(currentTierName) {
     if (tiersRes.ok) {
       const activeTiers = await tiersRes.json();
       if (activeTiers.length > 0) {
-        // Sắp xếp các hạng theo ID tăng dần (Hạng nào có ID nhỏ nhất chính là hạng thấp nhất/đầu tiên)
+        // Sắp xếp các hạng theo ID tăng dần
         activeTiers.sort((a, b) => (a.tierId || a.id) - (b.tierId || b.id));
         // Lấy tên hạng đầu tiên làm hạng mặc định hệ thống
         dynamicDefaultTier = activeTiers[0].tierName.toUpperCase();
@@ -297,20 +298,33 @@ async function renderPromotions(currentTierName) {
     const response = await fetch("http://localhost:8080/api/promotions/active");
     const promos = await response.json();
 
-    // Nếu profile khách hàng không có tên hạng, tự động đưa về hạng đầu tiên tìm được ở trên
+    // Nếu profile khách hàng không có tên hạng, tự động đưa về hạng đầu tiên
     const customerTier = currentTierName
       ? currentTierName.toUpperCase()
       : dynamicDefaultTier;
 
-    // 3. Tiến hành lọc trùng khớp hoàn toàn (Strict Equality)
+    // LẤY NGÀY ĐẶT LỊCH ĐỂ SO SÁNH (Mặc định lấy ngày hiện tại nếu chưa có)
+    const dateInput = document.getElementById("bookingDate");
+    const checkDate =
+      dateInput && dateInput.value
+        ? dateInput.value
+        : new Date().toISOString().split("T")[0];
+
+    // 3. Tiến hành lọc: Trùng khớp Hạng thành viên VÀ Thời gian khuyến mãi
     const eligiblePromos = promos.filter((p) => {
-      // Nếu chương trình khuyến mãi không để minTierName, coi như dành cho hạng đầu tiên
+      // CHECK 1: Hạng thành viên
       const promoTierName = p.minTierName
         ? p.minTierName.toUpperCase()
         : dynamicDefaultTier;
+      const isTierValid = customerTier === promoTierName;
 
-      // Kiểm tra xem hạng khách hàng có trùng khớp hoàn toàn với hạng của khuyến mãi không
-      return customerTier === promoTierName;
+      // CHECK 2: Thời gian hợp lệ (So sánh chuỗi định dạng YYYY-MM-DD)
+      const isTimeValid =
+        (!p.startDate || checkDate >= p.startDate) &&
+        (!p.endDate || checkDate <= p.endDate);
+
+      // Khuyến mãi chỉ hợp lệ khi đạt cả 2 điều kiện
+      return isTierValid && isTimeValid;
     });
 
     select.innerHTML =
@@ -321,6 +335,9 @@ async function renderPromotions(currentTierName) {
             `<option value="${p.promoId}" data-discount="${p.discountAmount}">${p.promoName} (-${p.discountAmount.toLocaleString()}đ)</option>`,
         )
         .join("");
+
+    // Cập nhật lại giá nếu promotion đang chọn bị mất do hết hạn
+    updatePriceSummary();
   } catch (error) {
     console.error("Lỗi tải khuyến mãi:", error);
     select.innerHTML = '<option value="">Lỗi tải khuyến mãi</option>';
@@ -464,7 +481,7 @@ async function confirmBooking(e) {
     // Giữ lại 3 giây để khách kịp kiểm tra bảng tóm tắt hóa đơn cuối cùng
     setTimeout(() => {
       window.location.href = "booking-history.html";
-    }, 5000);
+    }, 3000);
   } catch (error) {
     console.error("Lỗi đặt lịch cụ thể:", error);
     showToast(error.message); // Hiển thị chuẩn thông báo lỗi từ Backend trả về

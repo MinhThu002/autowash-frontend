@@ -85,38 +85,6 @@ async function renderCustomerDashboard() {
     document.getElementById("totalSpending").textContent = formatCurrency(
       profile.totalSpend || 0,
     );
-
-    // 5. Tính toán tiến độ lên hạng kế tiếp (Đã đồng bộ logic với trang Loyalty)
-    const currentTierName = profile.loyaltyTier.tierName;
-    const sortedTiers = activeTiers.sort(
-      (a, b) => a.priorityLevel - b.priorityLevel,
-    );
-    const currentIdx = sortedTiers.findIndex(
-      (t) => t.tierName === currentTierName,
-    );
-    const nextTier = sortedTiers[currentIdx + 1];
-
-    if (nextTier) {
-      const visitProgress = Math.min(
-        100,
-        ((profile.totalVisits || 0) / nextTier.minVisits) * 100,
-      );
-      const spendProgress = Math.min(
-        100,
-        ((profile.totalSpend || 0) / nextTier.minSpending) * 100,
-      );
-      const progress = Math.round((visitProgress + spendProgress) / 2);
-
-      document.getElementById("nextTierName").textContent = nextTier.tierName;
-      document.getElementById("tierProgressFill").style.width = progress + "%";
-      document.getElementById("tierProgressText").textContent =
-        `${progress}% đến ${nextTier.tierName}`;
-    } else {
-      document.getElementById("nextTierName").textContent = "Tối đa";
-      document.getElementById("tierProgressFill").style.width = "100%";
-      document.getElementById("tierProgressText").textContent =
-        "Bạn đã ở hạng cao nhất!";
-    }
   } catch (error) {
     showToast(error.message || "Không tải được thông tin Dashboard.");
     console.error("Lỗi đồng bộ Dashboard:", error);
@@ -263,7 +231,7 @@ async function renderBookingHistory() {
   const tbody = document.querySelector("#bookingsTable tbody");
 
   tbody.innerHTML =
-    '<tr><td colspan="7" style="text-align: center;">Đang tải dữ liệu...</td></tr>';
+    '<tr><td colspan="8" style="text-align: center;">Đang tải dữ liệu...</td></tr>';
 
   try {
     const response = await fetch(
@@ -275,7 +243,7 @@ async function renderBookingHistory() {
 
     if (!bookings || bookings.length === 0) {
       tbody.innerHTML =
-        '<tr><td colspan="7" style="text-align: center;">Chưa có lịch sử đặt lịch nào.</td></tr>';
+        '<tr><td colspan="8" style="text-align: center;">Chưa có lịch sử đặt lịch nào.</td></tr>';
       return;
     }
 
@@ -301,6 +269,7 @@ async function renderBookingHistory() {
         <td>${endTimeStr}</td>
         <td>${b.licensePlate}</td>
         <td>${b.serviceName}</td>
+        <td>${b.addOn || "-"}</td> <!-- Hiển thị addOn, nếu không có thì để dấu "-" -->
         <td>${getStatusBadge(statusUi)}</td>
         <td>${formatCurrency(b.totalPrice)}</td>
       </tr>`;
@@ -309,11 +278,10 @@ async function renderBookingHistory() {
   } catch (error) {
     console.error("Lỗi khi tải lịch sử đặt lịch:", error);
     tbody.innerHTML =
-      '<tr><td colspan="7" style="text-align: center; color: red;">Không tải được dữ liệu lịch sử.</td></tr>';
+      '<tr><td colspan="8" style="text-align: center; color: red;">Không tải được dữ liệu lịch sử.</td></tr>';
     showToast("Lỗi khi tải lịch sử đặt lịch.");
   }
 }
-
 async function renderLoyaltyPage() {
   // 1. Kiểm tra xác thực quyền truy cập của Khách hàng
   const user = requireAuth(["customer"]);
@@ -378,44 +346,6 @@ async function renderLoyaltyPage() {
         <li>Hệ số tích lũy điểm thưởng: <strong>x${currentTierConfig.pointMultiplier}</strong> khi thanh toán</li>
         <li>Thời hạn đặt lịch linh hoạt: Đặt trước tối đa <strong>${currentTierConfig.bookingWindowDays} ngày</strong></li>
       `;
-    }
-
-    // ==========================================
-    // KHỐI 2: TÍNH TOÁN TIẾN ĐỘ LÊN HẠNG KẾ TIẾP
-    // ==========================================
-    // Sắp xếp các hạng theo mức độ ưu tiên tăng dần
-    const sortedTiers = activeTiers.sort(
-      (a, b) => a.priorityLevel - b.priorityLevel,
-    );
-    const currentIdx = sortedTiers.findIndex(
-      (t) => t.tierName === currentTierName,
-    );
-    const nextTier = sortedTiers[currentIdx + 1];
-
-    if (nextTier) {
-      document.getElementById("loyaltyNextTier").textContent =
-        nextTier.tierName;
-
-      // Tính toán phần trăm tiến độ dựa vào số lượt đến rửa xe và tổng chi tiêu thực tế của khách hàng
-      const visitProgress = Math.min(
-        100,
-        ((profile.totalVisits || 0) / nextTier.minVisits) * 100,
-      );
-      const spendProgress = Math.min(
-        100,
-        ((profile.totalSpend || 0) / nextTier.minSpending) * 100,
-      );
-      const totalProgress = Math.round((visitProgress + spendProgress) / 2);
-
-      document.getElementById("loyaltyProgressFill").style.width =
-        totalProgress + "%";
-      document.getElementById("loyaltyProgressLabel").textContent =
-        `${totalProgress}% — Yêu cầu đạt tối thiểu ${nextTier.minVisits} lượt dịch vụ & ${formatCurrency(nextTier.minSpending)}`;
-    } else {
-      document.getElementById("loyaltyNextTier").textContent = "CẤP TỐI ĐA";
-      document.getElementById("loyaltyProgressFill").style.width = "100%";
-      document.getElementById("loyaltyProgressLabel").textContent =
-        "Chúc mừng! Bạn đã đạt danh hiệu hạng thành viên cao nhất.";
     }
 
     // ==========================================
@@ -599,7 +529,7 @@ async function renderPromotionsPage() {
       return;
     }
 
-    // 6. Đổ dữ liệu các khuyến mãi hợp lệ ra giao diện HTML
+    // 6. Đổ dữ liệu các khuyến mãi hợp lệ ra giao diện HTML (Đã bỏ nút "Sử dụng ngay")
     grid.innerHTML = eligiblePromotions
       .map((p) => {
         const discountDisplay =
@@ -619,7 +549,6 @@ async function renderPromotionsPage() {
           <span class="discount">Giảm ngay ${discountDisplay}</span>
           <div class="promo-footer">
             <p class="text-muted"><span class="icon">📅</span> HSD: ${formatDate(p.startDate)} - ${formatDate(p.endDate)}</p>
-            <button class="btn btn-sm btn-primary" onclick="usePromotion('${p.promoName}')">Sử dụng ngay</button>
           </div>
         </div>
       `;
@@ -1023,13 +952,14 @@ async function renderAdminBookings() {
         }
         // --- KẾT THÚC CẬP NHẬT ---
 
-        // Khớp cấu trúc các cột với <thead> trong file admin-bookings.html
         return `<tr data-status="${statusLower}" data-id="${bookingId}">
-        <td><strong>${b.customerName || b.fullName || "Khách vãng lai"}</strong></td>
+        <td><strong>${b.fullName || b.customerName || "Khách vãng lai"}</strong></td>
+        <td>${b.customerPhoneNumber || "-"}</td> <!-- Đã sửa thành customerPhoneNumber -->
         <td>${b.licensePlate || "-"}</td>
         <td>${b.serviceName || "Dịch vụ"}</td>
+        <td>${b.addOn || "-"}</td> 
         <td>${formatDate(b.bookingDate)}</td>
-        <td>${timeDisplay}</td> <!-- Hiển thị chuỗi thời gian đã được định dạng -->
+        <td>${timeDisplay}</td> 
         <td>${getStatusBadge(statusLower)}</td>
         <td>${formatCurrency(b.totalPrice)}</td>
         <td class="actions">
@@ -1323,12 +1253,14 @@ async function renderStaffSchedule() {
             <div class="schedule-time">${timeStr}</div>
             <div>
               <div class="schedule-card-top">
-                <h4>${booking.customerName || booking.fullName || "Khách vãng lai"}</h4>
+                <h4>${booking.fullName || booking.customerName || "Khách vãng lai"}</h4>
                 ${getStatusBadge(statusLower)}
               </div>
               <div class="schedule-meta">
+                <span>📞 ${booking.customerPhoneNumber || "N/A"}</span> <!-- Đã sửa thành customerPhoneNumber -->
                 <span>🚗 ${booking.licensePlate || "N/A"}</span>
                 <span>🔧 ${booking.serviceName || "N/A"}</span>
+                <span>➕ ${booking.addOn || "Không có"}</span>
                 <span>💰 ${formatCurrency(booking.totalPrice)}</span>
               </div>
               <div class="schedule-actions">
@@ -1819,7 +1751,7 @@ async function savePromotion(e) {
     minTierId: parseInt(tierSelectVal), // Luôn luôn gửi ID của hạng đã chọn
   };
 
-  if (!data.promoName || data.discountAmount <= 0) {
+  if (!data.promoName || data.discountAmount < 0) {
     showToast("Vui lòng kiểm tra lại thông tin khuyến mãi.");
     return;
   }
@@ -1903,8 +1835,15 @@ async function saveReward(e) {
     isActive: document.getElementById("rewardActive").value === "true", // Đã khớp với 'Active'/'Inactive'
   };
 
-  if (!payload.rewardName || payload.pointsRequired < 1) {
-    showToast("Vui lòng nhập tên quà và điểm đổi hợp lệ.");
+  // Cho phép discountAmount bằng 0, chỉ chặn khi < 0
+  if (
+    !payload.rewardName ||
+    payload.pointsRequired < 1 ||
+    payload.discountAmount < 0
+  ) {
+    showToast(
+      "Vui lòng nhập tên quà, điểm đổi hợp lệ và giá trị không được là số âm.",
+    );
     return;
   }
 

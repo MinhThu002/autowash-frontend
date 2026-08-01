@@ -141,8 +141,13 @@ async function saveVehicle(e) {
 
   const customerId = getLoggedInCustomerId();
   const vehicleId = document.getElementById("vehicleId").value;
+
+  // Lấy và chuẩn hóa biển số xe thành chữ in hoa
+  const rawLicensePlate = document.getElementById("vehiclePlate").value.trim();
+  const normalizedPlate = rawLicensePlate.toUpperCase();
+
   const payload = buildVehicleRequest(customerId, {
-    licensePlate: document.getElementById("vehiclePlate").value.trim(),
+    licensePlate: normalizedPlate,
     vehicleType: document.getElementById("vehicleType").value,
     brand: document.getElementById("vehicleBrand").value.trim(),
     color: document.getElementById("vehicleColor").value.trim(),
@@ -152,6 +157,16 @@ async function saveVehicle(e) {
     showToast("Vui lòng nhập biển số và hãng xe.");
     return;
   }
+
+  // ==========================================
+  // BỔ SUNG VALIDATE BIỂN SỐ XE
+  // ==========================================
+  const licensePlateRegex = /^[0-9]{2}[A-Z][0-9A-Z]?-[0-9]{4,5}$/;
+  if (!licensePlateRegex.test(payload.licensePlate)) {
+    showToast("Biển số xe không hợp lệ. Vui lòng nhập theo định dạng VD: 61A-22222 hoặc 59A1-12345.");
+    return;
+  }
+  // ==========================================
 
   if (!window.AutoWashAPI) {
     showToast("API chưa sẵn sàng.");
@@ -1400,12 +1415,12 @@ function renderTierChart(data, containerId) {
     <div class="donut-chart" style="background:conic-gradient(${gradient.join(",")})"></div>
     <div class="donut-legend" style="margin-top:1rem">
       ${Object.entries(data)
-        .map(([t, c]) => {
-          const colorKey = t.toLowerCase();
-          const color = colors[colorKey] || "#007bff";
-          return `<div class="legend-item"><span class="legend-dot" style="background:${color}"></span>${t}: ${c}</div>`;
-        })
-        .join("")}
+      .map(([t, c]) => {
+        const colorKey = t.toLowerCase();
+        const color = colors[colorKey] || "#007bff";
+        return `<div class="legend-item"><span class="legend-dot" style="background:${color}"></span>${t}: ${c}</div>`;
+      })
+      .join("")}
     </div>`;
 }
 

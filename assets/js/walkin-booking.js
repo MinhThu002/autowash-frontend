@@ -155,13 +155,50 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // 2. Thu thập và chuẩn hóa dữ liệu từ form nhập liệu
+      // ==========================================
+      // BỔ SUNG VALIDATE DỮ LIỆU ĐẦU VÀO
+      // ==========================================
       const emailValue = document.getElementById("email").value.trim();
+      const phoneValue = document.getElementById("phoneNumber").value.trim();
+      const licensePlateValue = document
+        .getElementById("licensePlate")
+        .value.trim();
+      const normalizedPlate = licensePlateValue.toUpperCase(); // Chuẩn hóa biển số thành chữ in hoa
+
+      // Validate Email (Chỉ kiểm tra nếu có nhập)
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (emailValue !== "" && !emailRegex.test(emailValue)) {
+        alert(
+          "Email không hợp lệ. Vui lòng nhập đúng định dạng (VD: customer@gmail.com).",
+        );
+        return;
+      }
+
+      // Validate Số điện thoại (10 số, bắt đầu bằng 03, 05, 07, 08, 09)
+      const phoneRegex = /^(0[3|5|7|8|9])+([0-9]{8})$/;
+      if (!phoneRegex.test(phoneValue)) {
+        alert(
+          "Số điện thoại không hợp lệ. Vui lòng nhập 10 chữ số bắt đầu bằng 03, 05, 07, 08 hoặc 09.",
+        );
+        return;
+      }
+
+      // Validate Biển số xe (Định dạng VN: 61A-22222, 59A1-12345)
+      const licensePlateRegex = /^[0-9]{2}[A-Z][0-9A-Z]?-[0-9]{4,5}$/;
+      if (!licensePlateRegex.test(normalizedPlate)) {
+        alert(
+          "Biển số xe không hợp lệ. Vui lòng nhập theo định dạng VD: 61A-22222 hoặc 59A1-12345.",
+        );
+        return;
+      }
+      // ==========================================
+
+      // 2. Thu thập và chuẩn hóa dữ liệu từ form nhập liệu (Đã dùng các biến sau validate)
       const payload = {
         walkInCustomerName: document.getElementById("fullName").value.trim(),
-        walkInPhoneNumber: document.getElementById("phoneNumber").value.trim(),
-        email: emailValue !== "" ? emailValue : null, // Gửi null nếu không nhập email
-        licensePlate: document.getElementById("licensePlate").value.trim(),
+        walkInPhoneNumber: phoneValue,
+        email: emailValue !== "" ? emailValue : null,
+        licensePlate: normalizedPlate,
         vehicleType: document.getElementById("vehicleType").value,
         brand: document.getElementById("brand").value.trim(),
         color: document.getElementById("color").value.trim(),
